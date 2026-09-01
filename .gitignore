@@ -1,0 +1,5 @@
+/bin/
+/eeban
+*.db
+*.db-shm
+*.db-wal
