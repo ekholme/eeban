@@ -22,3 +22,7 @@ just test
 | `h` `l` / `←` `→` | previous / next column |
 | `j` `k` / `↓` `↑` | next / previous card |
 | `q` / `ctrl+c` | quit |
+
+## License
+
+[MIT](LICENSE)
