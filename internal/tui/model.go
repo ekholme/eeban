@@ -29,6 +29,13 @@ type Model struct {
 	adding     bool // title input active for a new card
 	titleInput textinput.Model
 
+	editing bool // edit form active for the selected card
+	form    editForm
+
+	addingColumn   bool // name input active for a new column
+	renamingColumn bool // name input active for renaming the current column
+	columnInput    textinput.Model
+
 	err error // last mutation error, cleared on the next keypress
 
 	keys   KeyMap
@@ -61,9 +68,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 		m.board = msg.board
-		if msg.selectCardID != nil {
+		switch {
+		case msg.selectCardID != nil:
 			m.selectCardByID(*msg.selectCardID)
-		} else {
+		case msg.selectColumnID != nil:
+			m.selectColumnByID(*msg.selectColumnID)
+		default:
 			m.colCursor = clamp(m.colCursor, 0, m.lastColIndex())
 			m.clampCardCursor()
 		}
@@ -72,6 +82,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.adding {
 			return m.updateAdding(msg)
+		}
+		if m.editing {
+			return m.updateEditForm(msg)
+		}
+		if m.addingColumn || m.renamingColumn {
+			return m.updateColumnInput(msg)
 		}
 
 		m.err = nil
@@ -94,6 +110,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showDetail = false
 		case key.Matches(msg, m.keys.New):
 			return m.startAdding()
+		case key.Matches(msg, m.keys.Edit):
+			return m.startEdit()
 		case key.Matches(msg, m.keys.Delete):
 			return m.startDelete()
 		case key.Matches(msg, m.keys.MoveLeft):
@@ -104,6 +122,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.reorderCard(-1)
 		case key.Matches(msg, m.keys.ReorderDown):
 			return m.reorderCard(1)
+		case key.Matches(msg, m.keys.NewColumn):
+			return m.startAddingColumn()
+		case key.Matches(msg, m.keys.RenameColumn):
+			return m.startRenamingColumn()
+		case key.Matches(msg, m.keys.DeleteColumn):
+			return m.startDeleteColumn()
+		case key.Matches(msg, m.keys.ColumnLeft):
+			return m.reorderColumn(-1)
+		case key.Matches(msg, m.keys.ColumnRight):
+			return m.reorderColumn(1)
 		}
 	}
 	return m, nil
@@ -142,6 +170,125 @@ func (m Model) updateAdding(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.titleInput, cmd = m.titleInput.Update(msg)
 	return m, cmd
+}
+
+// startEdit opens the full edit form (title, body, priority, due date) for
+// the selected card.
+func (m Model) startEdit() (tea.Model, tea.Cmd) {
+	if m.svc == nil {
+		return m, nil
+	}
+	card, ok := m.selectedCard()
+	if !ok {
+		return m, nil
+	}
+	m.form = newEditForm(card)
+	m.editing = true
+	return m, textinput.Blink
+}
+
+// updateEditForm routes key input to the edit form while it's active,
+// submitting or cancelling as directed.
+func (m Model) updateEditForm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	form, cmd, action := m.form.update(msg)
+	m.form = form
+
+	switch action {
+	case formCancel:
+		m.editing = false
+		return m, nil
+	case formSubmit:
+		m.editing = false
+		title := strings.TrimSpace(m.form.title.Value())
+		if title == "" {
+			return m, nil
+		}
+		return m, m.updateCardCmd(m.form.cardID, title, m.form.body.Value(), m.form.priority, m.form.dueDatePtr())
+	}
+	return m, cmd
+}
+
+// startAddingColumn opens the name input for a new column at the end of the
+// board.
+func (m Model) startAddingColumn() (tea.Model, tea.Cmd) {
+	if m.svc == nil {
+		return m, nil
+	}
+	ti := textinput.New()
+	ti.Placeholder = "Column name"
+	ti.CharLimit = 100
+	ti.Focus()
+	m.columnInput = ti
+	m.addingColumn = true
+	return m, textinput.Blink
+}
+
+// startRenamingColumn opens the name input pre-filled with the current
+// column's name.
+func (m Model) startRenamingColumn() (tea.Model, tea.Cmd) {
+	if m.svc == nil || len(m.board.Columns) == 0 {
+		return m, nil
+	}
+	ti := textinput.New()
+	ti.Placeholder = "Column name"
+	ti.CharLimit = 100
+	ti.SetValue(m.board.Columns[m.colCursor].Name)
+	ti.CursorEnd()
+	ti.Focus()
+	m.columnInput = ti
+	m.renamingColumn = true
+	return m, textinput.Blink
+}
+
+// updateColumnInput routes key input to the column name textinput while
+// adding or renaming a column.
+func (m Model) updateColumnInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.addingColumn = false
+		m.renamingColumn = false
+		return m, nil
+	case tea.KeyEnter:
+		name := strings.TrimSpace(m.columnInput.Value())
+		adding := m.addingColumn
+		m.addingColumn = false
+		m.renamingColumn = false
+		if name == "" {
+			return m, nil
+		}
+		if adding {
+			return m, m.createColumnCmd(m.board.ID, name)
+		}
+		columnID := m.board.Columns[m.colCursor].ID
+		return m, m.renameColumnCmd(columnID, name)
+	}
+
+	var cmd tea.Cmd
+	m.columnInput, cmd = m.columnInput.Update(msg)
+	return m, cmd
+}
+
+// startDeleteColumn removes the current column along with its cards.
+func (m Model) startDeleteColumn() (tea.Model, tea.Cmd) {
+	if m.svc == nil || len(m.board.Columns) == 0 {
+		return m, nil
+	}
+	col := m.board.Columns[m.colCursor]
+	return m, m.deleteColumnCmd(col.ID)
+}
+
+// reorderColumn swaps the current column with its neighbour dir steps away
+// (-1 left, +1 right).
+func (m Model) reorderColumn(dir int) (tea.Model, tea.Cmd) {
+	if m.svc == nil || len(m.board.Columns) == 0 {
+		return m, nil
+	}
+	col := m.board.Columns[m.colCursor]
+	newIndex := m.colCursor + dir
+	if newIndex < 0 || newIndex >= len(m.board.Columns) {
+		return m, nil
+	}
+	return m, m.moveColumnCmd(m.board.ID, col.ID, newIndex)
 }
 
 // startDelete removes the selected card.
@@ -201,6 +348,20 @@ func (m *Model) selectCardByID(id int64) {
 				m.colCursor, m.cardCursor = ci, cj
 				return
 			}
+		}
+	}
+	m.colCursor = clamp(m.colCursor, 0, m.lastColIndex())
+	m.clampCardCursor()
+}
+
+// selectColumnByID moves the cursor onto the column with the given id, if it
+// is still present after a reload.
+func (m *Model) selectColumnByID(id int64) {
+	for i, col := range m.board.Columns {
+		if col.ID == id {
+			m.colCursor = i
+			m.clampCardCursor()
+			return
 		}
 	}
 	m.colCursor = clamp(m.colCursor, 0, m.lastColIndex())

@@ -48,3 +48,23 @@ func (s *Service) DeleteCard(ctx context.Context, id int64) error {
 func (s *Service) MoveCard(ctx context.Context, cardID, toColumnID int64, toIndex int) error {
 	return s.db.MoveCard(ctx, cardID, toColumnID, toIndex)
 }
+
+// CreateColumn adds a new column to the end of boardID.
+func (s *Service) CreateColumn(ctx context.Context, boardID int64, name string) (domain.Column, error) {
+	return s.db.CreateColumn(ctx, boardID, name)
+}
+
+// RenameColumn overwrites a column's name.
+func (s *Service) RenameColumn(ctx context.Context, id int64, name string) error {
+	return s.db.RenameColumn(ctx, id, name)
+}
+
+// DeleteColumn permanently removes a column and its cards.
+func (s *Service) DeleteColumn(ctx context.Context, id int64) error {
+	return s.db.DeleteColumn(ctx, id)
+}
+
+// MoveColumn relocates a column to position toIndex within boardID.
+func (s *Service) MoveColumn(ctx context.Context, boardID, columnID int64, toIndex int) error {
+	return s.db.MoveColumn(ctx, boardID, columnID, toIndex)
+}

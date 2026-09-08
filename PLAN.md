@@ -68,9 +68,9 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 - [x] Read-only board render: columns side by side, cards, selection cursor
 - [x] Navigate cards/columns (`h/j/k/l` + arrow keys), resize handling
 - [x] Card detail pane for the selected card (`enter` toggles, `esc` closes)
-- [ ] Create card (title only, `n`) / edit body+priority+due date / delete card (`d`)
+- [x] Create card (title only, `n`) / edit body+priority+due date (`e`) / delete card (`d`)
 - [x] Move card across columns (`H`/`L`); reorder within a column (`J`/`K`)
-- [ ] Add / rename / delete / reorder columns
+- [x] Add / rename / delete / reorder columns (`N`/`R`/`D`/`[`/`]`)
 - [ ] Help overlay (`?`), confirm dialog, transient error toast
 - [x] Every mutation persisted immediately
 
@@ -97,9 +97,9 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 2. **Read model** — `store.LoadBoard` returns board + columns + cards ordered by position. ✅
 3. **Read-only TUI** — render seeded board, navigation, `WindowSizeMsg` layout. ✅
 4. **Domain + service mutators** — create/move/reorder card, with unit tests against `file::memory:`. ✅
-5. **Wire mutations into the TUI** — card CRUD, move/reorder, as `tea.Cmd`s that reload the board. ✅ (quick-add title only; full edit form still open)
-6. **Column management.**
-7. **Card form + detail pane** — Bubbles `textinput` / `textarea`, nested model + focus. (detail pane ✅; title quick-add ✅; body/priority/due-date edit form still open)
+5. **Wire mutations into the TUI** — card CRUD, move/reorder, as `tea.Cmd`s that reload the board. ✅
+6. **Column management.** ✅
+7. **Card form + detail pane** — Bubbles `textinput` / `textarea`, nested model + focus. ✅ (detail pane, title quick-add, full body/priority/due-date edit form via `e`)
 8. **Help, confirms, toasts, styling pass.**
 9. **Iterate on v1.**
 

@@ -23,17 +23,26 @@ func (m Model) View() string {
 		return "loading…"
 	}
 	if len(m.board.Columns) == 0 {
-		return m.board.Name + "\n\n(no columns yet)\n\npress q to quit"
+		return lipgloss.JoinVertical(lipgloss.Left,
+			m.styles.BoardTitle.Render(m.board.Name),
+			m.styles.Empty.Render("(no columns yet — press N to add one)"),
+			m.footer(),
+		)
 	}
 
 	colHeight := max(m.height-chromeHeight, 3)
 
 	boardWidth := m.width
 	var detail string
-	if m.showDetail {
+	showRightPane := m.showDetail || m.editing
+	if showRightPane {
 		detailWidth := clamp(m.width/3, 32, 48)
 		boardWidth = max(m.width-detailWidth-4, minColWidth)
-		detail = m.renderDetail(detailWidth, colHeight)
+		if m.editing {
+			detail = m.renderEditForm(detailWidth, colHeight)
+		} else {
+			detail = m.renderDetail(detailWidth, colHeight)
+		}
 	}
 
 	colWidth := clamp(boardWidth/len(m.board.Columns)-2, minColWidth, maxColWidth)
@@ -44,7 +53,7 @@ func (m Model) View() string {
 	}
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
-	if m.showDetail {
+	if showRightPane {
 		body = lipgloss.JoinHorizontal(lipgloss.Top, body, detail)
 	}
 
@@ -62,6 +71,12 @@ func (m Model) footer() string {
 	case m.adding:
 		col := m.board.Columns[m.colCursor].Name
 		return m.styles.Prompt.Render(fmt.Sprintf("New card in %s: ", col)) + m.titleInput.View()
+	case m.addingColumn:
+		return m.styles.Prompt.Render("New column: ") + m.columnInput.View()
+	case m.renamingColumn:
+		return m.styles.Prompt.Render("Rename column: ") + m.columnInput.View()
+	case m.editing:
+		return m.styles.Help.Render("tab/shift+tab field · ←/→ priority · ctrl+s save · esc cancel")
 	case m.err != nil:
 		return m.styles.ErrorLine.Render("error: " + m.err.Error())
 	default:
@@ -73,7 +88,7 @@ func (m Model) helpLine() string {
 	if m.showDetail {
 		return "j/k card · h/l column · enter/esc close · q quit"
 	}
-	return "h/l col · j/k card · H/L move · J/K reorder · n new · d del · enter detail · q quit"
+	return "h/l·j/k nav · H/L·J/K move/reorder · n/e/d card · N/R/D/[/] col · enter detail · q quit"
 }
 
 // renderDetail draws the pane describing the selected card.
@@ -109,6 +124,45 @@ func (m Model) renderDetail(width, height int) string {
 	}
 
 	return frame.Render(b.String())
+}
+
+// renderEditForm draws the card edit form: title, body, priority, due date.
+func (m Model) renderEditForm(width, height int) string {
+	frame := m.styles.Detail.Width(width).Height(height).MaxHeight(height + 2)
+
+	inner := width - 4 // border + horizontal padding
+	f := m.form
+	f.setWidth(inner)
+	f.body.SetHeight(clamp(height-10, 3, 10))
+
+	var b strings.Builder
+	b.WriteString(m.fieldLabel("Title", f.focus == fieldTitle))
+	b.WriteByte('\n')
+	b.WriteString(f.title.View())
+	b.WriteString("\n\n")
+
+	b.WriteString(m.fieldLabel("Body", f.focus == fieldBody))
+	b.WriteByte('\n')
+	b.WriteString(f.body.View())
+	b.WriteByte('\n')
+
+	b.WriteString(m.fieldLabel("Priority", f.focus == fieldPriority))
+	b.WriteString("  " + priorityLabel(f.priority))
+	b.WriteByte('\n')
+
+	b.WriteString(m.fieldLabel("Due", f.focus == fieldDueDate))
+	b.WriteByte('\n')
+	b.WriteString(f.dueDate.View())
+
+	return frame.Render(b.String())
+}
+
+// fieldLabel renders an edit-form field label, highlighted when active.
+func (m Model) fieldLabel(label string, active bool) string {
+	if active {
+		return m.styles.Prompt.Render("> " + label)
+	}
+	return m.styles.DetailLabel.Render("  " + label)
 }
 
 func (m Model) renderColumn(col domain.Column, width, height int, active bool) string {

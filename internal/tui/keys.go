@@ -11,13 +11,21 @@ type KeyMap struct {
 	Detail      key.Binding
 	Back        key.Binding
 	New         key.Binding
+	Edit        key.Binding
 	Delete      key.Binding
 	MoveLeft    key.Binding
 	MoveRight   key.Binding
 	ReorderUp   key.Binding
 	ReorderDown key.Binding
-	Help        key.Binding
-	Quit        key.Binding
+
+	NewColumn    key.Binding
+	RenameColumn key.Binding
+	DeleteColumn key.Binding
+	ColumnLeft   key.Binding
+	ColumnRight  key.Binding
+
+	Help key.Binding
+	Quit key.Binding
 }
 
 // DefaultKeyMap returns the vim + arrow-key defaults.
@@ -30,12 +38,20 @@ func DefaultKeyMap() KeyMap {
 		Detail:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "toggle detail")),
 		Back:        key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close detail")),
 		New:         key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new card")),
+		Edit:        key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit card")),
 		Delete:      key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete card")),
 		MoveLeft:    key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "move card left")),
 		MoveRight:   key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "move card right")),
 		ReorderUp:   key.NewBinding(key.WithKeys("K"), key.WithHelp("K", "move card up")),
 		ReorderDown: key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "move card down")),
-		Help:        key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
-		Quit:        key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
+
+		NewColumn:    key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "new column")),
+		RenameColumn: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "rename column")),
+		DeleteColumn: key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "delete column")),
+		ColumnLeft:   key.NewBinding(key.WithKeys("["), key.WithHelp("[", "reorder column left")),
+		ColumnRight:  key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "reorder column right")),
+
+		Help: key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
+		Quit: key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	}
 }
