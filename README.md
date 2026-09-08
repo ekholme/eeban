@@ -21,6 +21,8 @@ just test
 |---|---|
 | `h` `l` / `←` `→` | previous / next column |
 | `j` `k` / `↓` `↑` | next / previous card |
+| `enter` | toggle detail pane for the selected card |
+| `esc` | close the detail pane |
 | `q` / `ctrl+c` | quit |
 
 ## License

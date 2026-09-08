@@ -21,6 +21,8 @@ type Model struct {
 	colCursor  int // index into board.Columns
 	cardCursor int // index into the selected column's cards
 
+	showDetail bool // detail pane visible for the selected card
+
 	keys   KeyMap
 	styles Styles
 }
@@ -58,6 +60,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cardCursor = clamp(m.cardCursor-1, 0, m.lastCardIndex())
 		case key.Matches(msg, m.keys.Down):
 			m.cardCursor = clamp(m.cardCursor+1, 0, m.lastCardIndex())
+		case key.Matches(msg, m.keys.Detail):
+			m.showDetail = !m.showDetail
+		case key.Matches(msg, m.keys.Back):
+			m.showDetail = false
 		}
 	}
 	return m, nil
@@ -76,6 +82,16 @@ func (m Model) currentCards() []domain.Card {
 
 func (m Model) lastCardIndex() int {
 	return len(m.currentCards()) - 1
+}
+
+// selectedCard returns the card under the cursor, or false when the current
+// column is empty.
+func (m Model) selectedCard() (domain.Card, bool) {
+	cards := m.currentCards()
+	if m.cardCursor < 0 || m.cardCursor >= len(cards) {
+		return domain.Card{}, false
+	}
+	return cards[m.cardCursor], true
 }
 
 func (m *Model) clampCardCursor() {

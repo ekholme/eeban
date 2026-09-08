@@ -12,6 +12,11 @@ type Styles struct {
 	CardActive   lipgloss.Style
 	Empty        lipgloss.Style
 	Help         lipgloss.Style
+	Detail       lipgloss.Style
+	DetailTitle  lipgloss.Style
+	DetailLabel  lipgloss.Style
+	DetailBody   lipgloss.Style
+	DetailDim    lipgloss.Style
 }
 
 // DefaultStyles returns styles that adapt to a light or dark terminal.
@@ -38,5 +43,14 @@ func DefaultStyles() Styles {
 		CardActive:  cardBase.BorderForeground(accent).Bold(true),
 		Empty:       lipgloss.NewStyle().Faint(true),
 		Help:        lipgloss.NewStyle().Foreground(subtle).MarginTop(1),
+		Detail: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(accent).
+			Padding(0, 1).
+			MarginLeft(1),
+		DetailTitle: lipgloss.NewStyle().Bold(true).MarginBottom(1),
+		DetailLabel: lipgloss.NewStyle().Foreground(subtle),
+		DetailBody:  lipgloss.NewStyle().MarginTop(1),
+		DetailDim:   lipgloss.NewStyle().Faint(true),
 	}
 }

@@ -67,7 +67,7 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 - [x] Repo scaffold, migration runner, seeded board
 - [x] Read-only board render: columns side by side, cards, selection cursor
 - [x] Navigate cards/columns (`h/j/k/l` + arrow keys), resize handling
-- [ ] Card detail pane for the selected card
+- [x] Card detail pane for the selected card (`enter` toggles, `esc` closes)
 - [ ] Create / edit / delete card (form: title, body, priority, due date)
 - [ ] Move card across columns; reorder within a column
 - [ ] Add / rename / delete / reorder columns
