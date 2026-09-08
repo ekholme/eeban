@@ -17,6 +17,8 @@ type Styles struct {
 	DetailLabel  lipgloss.Style
 	DetailBody   lipgloss.Style
 	DetailDim    lipgloss.Style
+	Prompt       lipgloss.Style
+	ErrorLine    lipgloss.Style
 }
 
 // DefaultStyles returns styles that adapt to a light or dark terminal.
@@ -52,5 +54,9 @@ func DefaultStyles() Styles {
 		DetailLabel: lipgloss.NewStyle().Foreground(subtle),
 		DetailBody:  lipgloss.NewStyle().MarginTop(1),
 		DetailDim:   lipgloss.NewStyle().Faint(true),
+		Prompt:      lipgloss.NewStyle().Foreground(accent).MarginTop(1),
+		ErrorLine: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "160", Dark: "203"}).
+			MarginTop(1),
 	}
 }

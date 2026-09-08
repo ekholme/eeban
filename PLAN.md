@@ -29,7 +29,7 @@ internal/
     migrations/001_init.sql  schema + seed board
     boards.go                board reads (LoadBoard = board + columns + cards)
     columns.go               column CRUD / reorder            (later)
-    cards.go                 card CRUD / move / reorder        (later)
+    cards.go                 card create/update/delete/move ✅
   service/                   the only API the TUI calls; orchestrates domain + store
   tui/
     model.go                 root Bubble Tea model, Update loop, cursor state
@@ -68,11 +68,11 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 - [x] Read-only board render: columns side by side, cards, selection cursor
 - [x] Navigate cards/columns (`h/j/k/l` + arrow keys), resize handling
 - [x] Card detail pane for the selected card (`enter` toggles, `esc` closes)
-- [ ] Create / edit / delete card (form: title, body, priority, due date)
-- [ ] Move card across columns; reorder within a column
+- [ ] Create card (title only, `n`) / edit body+priority+due date / delete card (`d`)
+- [x] Move card across columns (`H`/`L`); reorder within a column (`J`/`K`)
 - [ ] Add / rename / delete / reorder columns
 - [ ] Help overlay (`?`), confirm dialog, transient error toast
-- [ ] Every mutation persisted immediately
+- [x] Every mutation persisted immediately
 
 ### v1
 - [ ] Labels with colors; filter by label
@@ -96,10 +96,10 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 1. **Scaffold** — go.mod, justfile, migration runner, DB open with pragmas, seed. ✅
 2. **Read model** — `store.LoadBoard` returns board + columns + cards ordered by position. ✅
 3. **Read-only TUI** — render seeded board, navigation, `WindowSizeMsg` layout. ✅
-4. **Domain + service mutators** — create/move/reorder card, with unit tests against `file::memory:`.
-5. **Wire mutations into the TUI** — card CRUD, move/reorder, as `tea.Cmd`s that reload the board.
+4. **Domain + service mutators** — create/move/reorder card, with unit tests against `file::memory:`. ✅
+5. **Wire mutations into the TUI** — card CRUD, move/reorder, as `tea.Cmd`s that reload the board. ✅ (quick-add title only; full edit form still open)
 6. **Column management.**
-7. **Card form + detail pane** — Bubbles `textinput` / `textarea`, nested model + focus.
+7. **Card form + detail pane** — Bubbles `textinput` / `textarea`, nested model + focus. (detail pane ✅; title quick-add ✅; body/priority/due-date edit form still open)
 8. **Help, confirms, toasts, styling pass.**
 9. **Iterate on v1.**
 

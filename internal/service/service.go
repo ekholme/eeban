@@ -27,3 +27,24 @@ func New(db *store.DB) *Service {
 func (s *Service) DefaultBoard(ctx context.Context) (domain.Board, error) {
 	return s.db.LoadBoard(ctx, DefaultBoardID)
 }
+
+// CreateCard adds a new card with just a title to the end of columnID.
+func (s *Service) CreateCard(ctx context.Context, columnID int64, title string) (domain.Card, error) {
+	return s.db.CreateCard(ctx, columnID, title)
+}
+
+// UpdateCard overwrites a card's editable fields.
+func (s *Service) UpdateCard(ctx context.Context, id int64, title, body string, priority int, dueDate *string) error {
+	return s.db.UpdateCard(ctx, id, title, body, priority, dueDate)
+}
+
+// DeleteCard permanently removes a card.
+func (s *Service) DeleteCard(ctx context.Context, id int64) error {
+	return s.db.DeleteCard(ctx, id)
+}
+
+// MoveCard relocates a card to toColumnID at position toIndex, reordering in
+// place when toColumnID is the card's current column.
+func (s *Service) MoveCard(ctx context.Context, cardID, toColumnID int64, toIndex int) error {
+	return s.db.MoveCard(ctx, cardID, toColumnID, toIndex)
+}

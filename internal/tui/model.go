@@ -3,7 +3,10 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ekholme/eeban/internal/domain"
@@ -22,6 +25,11 @@ type Model struct {
 	cardCursor int // index into the selected column's cards
 
 	showDetail bool // detail pane visible for the selected card
+
+	adding     bool // title input active for a new card
+	titleInput textinput.Model
+
+	err error // last mutation error, cleared on the next keypress
 
 	keys   KeyMap
 	styles Styles
@@ -46,7 +54,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 
+	case boardLoadedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.err = nil
+		m.board = msg.board
+		if msg.selectCardID != nil {
+			m.selectCardByID(*msg.selectCardID)
+		} else {
+			m.colCursor = clamp(m.colCursor, 0, m.lastColIndex())
+			m.clampCardCursor()
+		}
+		return m, nil
+
 	case tea.KeyMsg:
+		if m.adding {
+			return m.updateAdding(msg)
+		}
+
+		m.err = nil
 		switch {
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
@@ -64,9 +92,119 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showDetail = !m.showDetail
 		case key.Matches(msg, m.keys.Back):
 			m.showDetail = false
+		case key.Matches(msg, m.keys.New):
+			return m.startAdding()
+		case key.Matches(msg, m.keys.Delete):
+			return m.startDelete()
+		case key.Matches(msg, m.keys.MoveLeft):
+			return m.moveCardToColumn(-1)
+		case key.Matches(msg, m.keys.MoveRight):
+			return m.moveCardToColumn(1)
+		case key.Matches(msg, m.keys.ReorderUp):
+			return m.reorderCard(-1)
+		case key.Matches(msg, m.keys.ReorderDown):
+			return m.reorderCard(1)
 		}
 	}
 	return m, nil
+}
+
+// startAdding opens the title input for a new card in the current column.
+func (m Model) startAdding() (tea.Model, tea.Cmd) {
+	if m.svc == nil || len(m.board.Columns) == 0 {
+		return m, nil
+	}
+	ti := textinput.New()
+	ti.Placeholder = "Card title"
+	ti.CharLimit = 200
+	ti.Focus()
+	m.titleInput = ti
+	m.adding = true
+	return m, textinput.Blink
+}
+
+// updateAdding routes key input to the title textinput while adding a card.
+func (m Model) updateAdding(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.adding = false
+		return m, nil
+	case tea.KeyEnter:
+		title := strings.TrimSpace(m.titleInput.Value())
+		m.adding = false
+		if title == "" {
+			return m, nil
+		}
+		columnID := m.board.Columns[m.colCursor].ID
+		return m, m.createCardCmd(columnID, title)
+	}
+
+	var cmd tea.Cmd
+	m.titleInput, cmd = m.titleInput.Update(msg)
+	return m, cmd
+}
+
+// startDelete removes the selected card.
+func (m Model) startDelete() (tea.Model, tea.Cmd) {
+	if m.svc == nil {
+		return m, nil
+	}
+	card, ok := m.selectedCard()
+	if !ok {
+		return m, nil
+	}
+	return m, m.deleteCardCmd(card.ID)
+}
+
+// moveCardToColumn moves the selected card to the column dir steps away
+// (-1 left, +1 right), appending it at the end.
+func (m Model) moveCardToColumn(dir int) (tea.Model, tea.Cmd) {
+	if m.svc == nil {
+		return m, nil
+	}
+	card, ok := m.selectedCard()
+	if !ok {
+		return m, nil
+	}
+	target := m.colCursor + dir
+	if target < 0 || target > m.lastColIndex() {
+		return m, nil
+	}
+	toColumn := m.board.Columns[target]
+	return m, m.moveCardCmd(card.ID, toColumn.ID, len(toColumn.Cards))
+}
+
+// reorderCard swaps the selected card with its neighbour dir steps away
+// (-1 up, +1 down) within the current column.
+func (m Model) reorderCard(dir int) (tea.Model, tea.Cmd) {
+	if m.svc == nil {
+		return m, nil
+	}
+	card, ok := m.selectedCard()
+	if !ok {
+		return m, nil
+	}
+	newIndex := m.cardCursor + dir
+	if newIndex < 0 || newIndex >= len(m.currentCards()) {
+		return m, nil
+	}
+	columnID := m.board.Columns[m.colCursor].ID
+	return m, m.moveCardCmd(card.ID, columnID, newIndex)
+}
+
+// selectCardByID moves the cursor onto the card with the given id, if it is
+// still present after a reload.
+func (m *Model) selectCardByID(id int64) {
+	for ci, col := range m.board.Columns {
+		for cj, c := range col.Cards {
+			if c.ID == id {
+				m.colCursor, m.cardCursor = ci, cj
+				return
+			}
+		}
+	}
+	m.colCursor = clamp(m.colCursor, 0, m.lastColIndex())
+	m.clampCardCursor()
 }
 
 func (m Model) lastColIndex() int {

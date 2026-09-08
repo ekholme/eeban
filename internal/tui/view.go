@@ -51,15 +51,29 @@ func (m Model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.styles.BoardTitle.Render(m.board.Name),
 		body,
-		m.styles.Help.Render(m.helpLine()),
+		m.footer(),
 	)
+}
+
+// footer renders the title input while adding a card, the last mutation
+// error if one occurred, or the contextual help line.
+func (m Model) footer() string {
+	switch {
+	case m.adding:
+		col := m.board.Columns[m.colCursor].Name
+		return m.styles.Prompt.Render(fmt.Sprintf("New card in %s: ", col)) + m.titleInput.View()
+	case m.err != nil:
+		return m.styles.ErrorLine.Render("error: " + m.err.Error())
+	default:
+		return m.styles.Help.Render(m.helpLine())
+	}
 }
 
 func (m Model) helpLine() string {
 	if m.showDetail {
 		return "j/k card · h/l column · enter/esc close · q quit"
 	}
-	return "h/l column · j/k card · enter detail · ? help · q quit"
+	return "h/l col · j/k card · H/L move · J/K reorder · n new · d del · enter detail · q quit"
 }
 
 // renderDetail draws the pane describing the selected card.
