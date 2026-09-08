@@ -100,7 +100,8 @@ func TestDeleteCardFlow(t *testing.T) {
 	m := send(New(svc, board), tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	before := len(m.currentCards())
-	m = runMutation(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = send(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = runMutation(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 
 	if m.err != nil {
 		t.Fatalf("unexpected error: %v", m.err)
@@ -292,7 +293,8 @@ func TestDeleteColumnFlow(t *testing.T) {
 	m := send(New(svc, board), tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	before := len(m.board.Columns)
-	m = runMutation(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	m = send(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	m = runMutation(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 
 	if m.err != nil {
 		t.Fatalf("unexpected error: %v", m.err)
@@ -343,6 +345,9 @@ func TestMutationsAreNoopWithNilService(t *testing.T) {
 		}
 		if nm.addingColumn || nm.renamingColumn {
 			t.Fatalf("key %q entered column-input mode with nil service", key)
+		}
+		if nm.confirm != nil {
+			t.Fatalf("key %q opened a confirm dialog with nil service", key)
 		}
 		m = nm
 	}

@@ -2,11 +2,25 @@ package tui
 
 import (
 	"context"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ekholme/eeban/internal/domain"
 )
+
+// toastDuration is how long a transient toast stays on screen.
+const toastDuration = 4 * time.Second
+
+// toastExpiredMsg fires toastDuration after a toast is shown. seq guards
+// against an older timer clearing a toast that has since been replaced.
+type toastExpiredMsg struct{ seq int }
+
+func toastExpireCmd(seq int) tea.Cmd {
+	return tea.Tick(toastDuration, func(time.Time) tea.Msg {
+		return toastExpiredMsg{seq: seq}
+	})
+}
 
 // boardLoadedMsg carries the result of a board reload, optionally after a
 // mutation. When err is non-nil, board is meaningless and the current model

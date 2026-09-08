@@ -71,7 +71,7 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 - [x] Create card (title only, `n`) / edit body+priority+due date (`e`) / delete card (`d`)
 - [x] Move card across columns (`H`/`L`); reorder within a column (`J`/`K`)
 - [x] Add / rename / delete / reorder columns (`N`/`R`/`D`/`[`/`]`)
-- [ ] Help overlay (`?`), confirm dialog, transient error toast
+- [x] Help overlay (`?`), confirm dialog, transient error toast
 - [x] Every mutation persisted immediately
 
 ### v1
@@ -100,7 +100,7 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 5. **Wire mutations into the TUI** — card CRUD, move/reorder, as `tea.Cmd`s that reload the board. ✅
 6. **Column management.** ✅
 7. **Card form + detail pane** — Bubbles `textinput` / `textarea`, nested model + focus. ✅ (detail pane, title quick-add, full body/priority/due-date edit form via `e`)
-8. **Help, confirms, toasts, styling pass.**
+8. **Help, confirms, toasts, styling pass.** ✅
 9. **Iterate on v1.**
 
 ## Risks / decisions to nail early

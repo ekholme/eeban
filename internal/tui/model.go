@@ -3,6 +3,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -36,10 +37,23 @@ type Model struct {
 	renamingColumn bool // name input active for renaming the current column
 	columnInput    textinput.Model
 
-	err error // last mutation error, cleared on the next keypress
+	err error // last mutation error, surfaced as a toast
+
+	toast    string // transient notification text, "" when hidden
+	toastSeq int    // bumped per toast so a stale timer can't clear a newer one
+
+	showHelp bool          // full-screen keybinding overlay
+	confirm  *confirmState // pending y/n confirmation, nil when none
 
 	keys   KeyMap
 	styles Styles
+}
+
+// confirmState is a pending yes/no confirmation. action is the command run
+// when the user answers "y".
+type confirmState struct {
+	prompt string
+	action tea.Cmd
 }
 
 // New builds the root model for an already-loaded board.
@@ -64,9 +78,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case boardLoadedMsg:
 		if msg.err != nil {
 			m.err = msg.err
-			return m, nil
+			cmd := m.setToast("error: " + msg.err.Error())
+			return m, cmd
 		}
 		m.err = nil
+		m.toast = ""
 		m.board = msg.board
 		switch {
 		case msg.selectCardID != nil:
@@ -79,7 +95,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case toastExpiredMsg:
+		if msg.seq == m.toastSeq {
+			m.toast = ""
+			m.err = nil
+		}
+		return m, nil
+
 	case tea.KeyMsg:
+		if m.confirm != nil {
+			return m.updateConfirm(msg)
+		}
+		if m.showHelp {
+			return m.updateHelp(msg)
+		}
 		if m.adding {
 			return m.updateAdding(msg)
 		}
@@ -90,10 +119,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateColumnInput(msg)
 		}
 
-		m.err = nil
 		switch {
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
+		case key.Matches(msg, m.keys.Help):
+			m.showHelp = true
 		case key.Matches(msg, m.keys.Left):
 			m.colCursor = clamp(m.colCursor-1, 0, m.lastColIndex())
 			m.clampCardCursor()
@@ -268,13 +298,17 @@ func (m Model) updateColumnInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// startDeleteColumn removes the current column along with its cards.
+// startDeleteColumn asks to confirm removing the current column and its cards.
 func (m Model) startDeleteColumn() (tea.Model, tea.Cmd) {
 	if m.svc == nil || len(m.board.Columns) == 0 {
 		return m, nil
 	}
 	col := m.board.Columns[m.colCursor]
-	return m, m.deleteColumnCmd(col.ID)
+	m.confirm = &confirmState{
+		prompt: fmt.Sprintf("Delete column %q and its cards?", col.Name),
+		action: m.deleteColumnCmd(col.ID),
+	}
+	return m, nil
 }
 
 // reorderColumn swaps the current column with its neighbour dir steps away
@@ -291,7 +325,7 @@ func (m Model) reorderColumn(dir int) (tea.Model, tea.Cmd) {
 	return m, m.moveColumnCmd(m.board.ID, col.ID, newIndex)
 }
 
-// startDelete removes the selected card.
+// startDelete asks to confirm removing the selected card.
 func (m Model) startDelete() (tea.Model, tea.Cmd) {
 	if m.svc == nil {
 		return m, nil
@@ -300,7 +334,45 @@ func (m Model) startDelete() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	return m, m.deleteCardCmd(card.ID)
+	m.confirm = &confirmState{
+		prompt: fmt.Sprintf("Delete card %q?", truncateText(card.Title, 40)),
+		action: m.deleteCardCmd(card.ID),
+	}
+	return m, nil
+}
+
+// updateConfirm handles keys while a yes/no confirmation is pending: "y" (or
+// enter) runs the pending action, anything else dismisses it.
+func (m Model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y", "enter":
+		action := m.confirm.action
+		m.confirm = nil
+		return m, action
+	default:
+		m.confirm = nil
+		return m, nil
+	}
+}
+
+// updateHelp handles keys while the help overlay is open. ctrl+c still quits;
+// "?" or esc closes it; every other key is swallowed.
+func (m Model) updateHelp(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Quit):
+		return m, tea.Quit
+	case key.Matches(msg, m.keys.Help), key.Matches(msg, m.keys.Back):
+		m.showHelp = false
+	}
+	return m, nil
+}
+
+// setToast shows text as a transient notification and returns the command
+// that clears it after toastDuration, unless a newer toast has replaced it.
+func (m *Model) setToast(text string) tea.Cmd {
+	m.toast = text
+	m.toastSeq++
+	return toastExpireCmd(m.toastSeq)
 }
 
 // moveCardToColumn moves the selected card to the column dir steps away

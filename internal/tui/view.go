@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/ekholme/eeban/internal/domain"
@@ -22,9 +23,12 @@ func (m Model) View() string {
 	if m.width == 0 {
 		return "loading…"
 	}
+	if m.showHelp {
+		return m.helpView()
+	}
 	if len(m.board.Columns) == 0 {
 		return lipgloss.JoinVertical(lipgloss.Left,
-			m.styles.BoardTitle.Render(m.board.Name),
+			m.header(),
 			m.styles.Empty.Render("(no columns yet — press N to add one)"),
 			m.footer(),
 		)
@@ -58,10 +62,54 @@ func (m Model) View() string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
-		m.styles.BoardTitle.Render(m.board.Name),
+		m.header(),
 		body,
 		m.footer(),
 	)
+}
+
+// header renders the board title, with the transient toast pinned to the
+// top-right when one is showing.
+func (m Model) header() string {
+	title := m.styles.BoardTitle.Render(m.board.Name)
+	if m.toast == "" {
+		return title
+	}
+	toast := m.styles.Toast.Render(m.toast)
+	gap := m.width - lipgloss.Width(title) - lipgloss.Width(toast)
+	if gap < 1 {
+		return lipgloss.JoinVertical(lipgloss.Left, title, toast)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, title, strings.Repeat(" ", gap), toast)
+}
+
+// helpView renders the full-screen keybinding overlay.
+func (m Model) helpView() string {
+	groups := []struct {
+		name     string
+		bindings []key.Binding
+	}{
+		{"Navigate", []key.Binding{m.keys.Left, m.keys.Right, m.keys.Up, m.keys.Down, m.keys.Detail, m.keys.Back}},
+		{"Cards", []key.Binding{m.keys.New, m.keys.Edit, m.keys.Delete, m.keys.MoveLeft, m.keys.MoveRight, m.keys.ReorderUp, m.keys.ReorderDown}},
+		{"Columns", []key.Binding{m.keys.NewColumn, m.keys.RenameColumn, m.keys.DeleteColumn, m.keys.ColumnLeft, m.keys.ColumnRight}},
+		{"General", []key.Binding{m.keys.Help, m.keys.Quit}},
+	}
+
+	var b strings.Builder
+	b.WriteString(m.styles.HelpHeading.Render("eeban — keybindings"))
+	for _, g := range groups {
+		b.WriteByte('\n')
+		b.WriteString(m.styles.HelpGroup.Render(g.name))
+		b.WriteByte('\n')
+		for _, bind := range g.bindings {
+			h := bind.Help()
+			b.WriteString(fmt.Sprintf("  %-12s %s\n", h.Key, h.Desc))
+		}
+	}
+	b.WriteString(m.styles.DetailDim.Render("\npress ? or esc to close"))
+
+	box := m.styles.HelpOverlay.Render(b.String())
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
 // footer renders the title input while adding a card, the last mutation
@@ -77,8 +125,8 @@ func (m Model) footer() string {
 		return m.styles.Prompt.Render("Rename column: ") + m.columnInput.View()
 	case m.editing:
 		return m.styles.Help.Render("tab/shift+tab field · ←/→ priority · ctrl+s save · esc cancel")
-	case m.err != nil:
-		return m.styles.ErrorLine.Render("error: " + m.err.Error())
+	case m.confirm != nil:
+		return m.styles.Prompt.Render(m.confirm.prompt + "  (y/n)")
 	default:
 		return m.styles.Help.Render(m.helpLine())
 	}
@@ -86,9 +134,9 @@ func (m Model) footer() string {
 
 func (m Model) helpLine() string {
 	if m.showDetail {
-		return "j/k card · h/l column · enter/esc close · q quit"
+		return "j/k card · h/l column · enter/esc close · ? help · q quit"
 	}
-	return "h/l·j/k nav · H/L·J/K move/reorder · n/e/d card · N/R/D/[/] col · enter detail · q quit"
+	return "h/l·j/k nav · H/L·J/K move/reorder · n/e/d card · N/R/D/[/] col · ? help · q quit"
 }
 
 // renderDetail draws the pane describing the selected card.
