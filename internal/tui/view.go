@@ -125,8 +125,9 @@ func (m Model) helpView() string {
 		bindings []key.Binding
 	}{
 		{"Navigate", []key.Binding{m.keys.Left, m.keys.Right, m.keys.Up, m.keys.Down, m.keys.Detail, m.keys.Back}},
-		{"Cards", []key.Binding{m.keys.New, m.keys.Edit, m.keys.Delete, m.keys.MoveLeft, m.keys.MoveRight, m.keys.ReorderUp, m.keys.ReorderDown}},
-		{"Columns", []key.Binding{m.keys.NewColumn, m.keys.RenameColumn, m.keys.DeleteColumn, m.keys.ColumnLeft, m.keys.ColumnRight}},
+		{"Cards", []key.Binding{m.keys.New, m.keys.Edit, m.keys.Delete, m.keys.Archive, m.keys.MoveLeft, m.keys.MoveRight, m.keys.ReorderUp, m.keys.ReorderDown}},
+		{"Columns", []key.Binding{m.keys.NewColumn, m.keys.RenameColumn, m.keys.DeleteColumn, m.keys.ColumnLeft, m.keys.ColumnRight, m.keys.WIPLimit}},
+		{"Organise", []key.Binding{m.keys.Labels, m.keys.Search, m.keys.ArchiveView, m.keys.Boards, m.keys.Undo}},
 		{"General", []key.Binding{m.keys.Help, m.keys.Quit}},
 	}
 
@@ -147,8 +148,8 @@ func (m Model) helpView() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
-// footer renders the title input while adding a card, the last mutation
-// error if one occurred, or the contextual help line.
+// footer renders the active input prompt, a pending confirmation, or the
+// contextual help line.
 func (m Model) footer() string {
 	switch {
 	case m.adding:
@@ -174,9 +175,9 @@ func (m Model) footer() string {
 
 func (m Model) helpLine() string {
 	if m.showDetail {
-		return "j/k card · h/l column · enter/esc close · ? help · q quit"
+		return "j/k card · h/l column · t labels · enter/esc close · ? help · q quit"
 	}
-	return "h/l·j/k nav · H/L·J/K move/reorder · n/e/d card · N/R/D/[/] col · ? help · q quit"
+	return "h/l·j/k nav · n/e/d/a card · t tag · / search · A archive · b boards · u undo · ? help"
 }
 
 // renderDetail draws the pane describing the selected card.
@@ -275,6 +276,7 @@ func (m Model) fieldLabel(label string, active bool) string {
 func (m Model) renderColumn(col domain.Column, width, height int, active bool) string {
 	var b strings.Builder
 
+	cards := m.visibleCards(col)
 	count := fmt.Sprintf("%d", len(col.Cards))
 	if col.WIPLimit != nil {
 		count = fmt.Sprintf("%d/%d", len(col.Cards), *col.WIPLimit)
@@ -286,7 +288,6 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s  %s", col.Name, count)))
 	b.WriteByte('\n')
 
-	cards := m.visibleCards(col)
 	switch {
 	case len(col.Cards) == 0:
 		b.WriteString(m.styles.Empty.Render("(empty)"))
@@ -299,6 +300,7 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 		if active && j == m.cardCursor {
 			style = m.styles.CardActive
 		}
+
 		title := card.Title
 		if dots := m.renderLabelDots(card.Labels); dots != "" {
 			title += " " + dots

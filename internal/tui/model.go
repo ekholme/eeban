@@ -24,7 +24,7 @@ type Model struct {
 	height int
 
 	colCursor  int // index into board.Columns
-	cardCursor int // index into the selected column's cards
+	cardCursor int // index into the selected column's visible cards
 
 	showDetail bool // detail pane visible for the selected card
 
@@ -62,6 +62,10 @@ type Model struct {
 	boardRenaming  bool // sub-input: rename the highlighted board
 	boardNameInput textinput.Model
 
+	undo          *undoState // the one reversible action, nil when none
+	pendingUndo   *undoState // promoted to undo once its mutation succeeds
+	pendingNotice string     // toast to raise after the next successful reload
+
 	err error // last mutation error, surfaced as a toast
 
 	toast    string // transient notification text, "" when hidden
@@ -72,6 +76,15 @@ type Model struct {
 
 	keys   KeyMap
 	styles Styles
+}
+
+// undoState is the single reversible action. cmd, when run, undoes it. When
+// needsCreatedCard is set, cmd is bound after the reload to delete the card
+// that was just created.
+type undoState struct {
+	desc             string
+	cmd              tea.Cmd
+	needsCreatedCard bool
 }
 
 // confirmState is a pending yes/no confirmation. action is the command run
@@ -131,6 +144,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirm != nil {
 			return m.updateConfirm(msg)
 		}
+		if m.filtering {
+			return m.updateFiltering(msg)
+		}
+		if m.settingWIP {
+			return m.updateWIPInput(msg)
+		}
+		if m.labelPicker {
+			return m.updateLabelPicker(msg)
+		}
+		if m.boardSwitcher {
+			return m.updateBoardSwitcher(msg)
+		}
+		if m.showArchive {
+			return m.updateArchive(msg)
+		}
 		if m.showHelp {
 			return m.updateHelp(msg)
 		}
@@ -142,21 +170,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.addingColumn || m.renamingColumn {
 			return m.updateColumnInput(msg)
-		}
-		if m.settingWIP {
-			return m.updateWIPInput(msg)
-		}
-		if m.filtering {
-			return m.updateFiltering(msg)
-		}
-		if m.labelPicker {
-			return m.updateLabelPicker(msg)
-		}
-		if m.boardSwitcher {
-			return m.updateBoardSwitcher(msg)
-		}
-		if m.showArchive {
-			return m.updateArchive(msg)
 		}
 		return m.updateBoard(msg)
 	}
@@ -190,10 +203,6 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.showDetail = false
-	case key.Matches(msg, m.keys.Labels):
-		return m.openLabelPicker()
-	case key.Matches(msg, m.keys.Search):
-		return m.startFiltering()
 	case key.Matches(msg, m.keys.New):
 		return m.startAdding()
 	case key.Matches(msg, m.keys.Edit):
@@ -204,8 +213,14 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.archiveSelected()
 	case key.Matches(msg, m.keys.ArchiveView):
 		return m.openArchive()
+	case key.Matches(msg, m.keys.Labels):
+		return m.openLabelPicker()
+	case key.Matches(msg, m.keys.Search):
+		return m.startFiltering()
 	case key.Matches(msg, m.keys.Boards):
 		return m.openBoardSwitcher()
+	case key.Matches(msg, m.keys.Undo):
+		return m.runUndo()
 	case key.Matches(msg, m.keys.MoveLeft):
 		return m.moveCardToColumn(-1)
 	case key.Matches(msg, m.keys.MoveRight):
@@ -230,16 +245,18 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// onBoardLoaded folds a board reload into the model: it swaps in the fresh
-// board and restores the cursor onto whichever item the mutation touched.
+// onBoardLoaded folds a board reload into the model: it restores the cursor,
+// applies any queued notice, and promotes a pending undo now that the
+// mutation behind the reload has succeeded.
 func (m Model) onBoardLoaded(msg boardLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		m.err = msg.err
+		m.pendingUndo = nil
+		m.pendingNotice = ""
 		return m, m.setToast("error: " + msg.err.Error())
 	}
 
 	m.err = nil
-	m.toast = ""
 	m.board = msg.board
 	m.boardID = msg.board.ID
 
@@ -256,23 +273,41 @@ func (m Model) onBoardLoaded(msg boardLoadedMsg) (tea.Model, tea.Cmd) {
 		m.clampCardCursor()
 	}
 
+	var cmd tea.Cmd
+	if m.pendingNotice != "" {
+		cmd = m.setToast(m.pendingNotice)
+		m.pendingNotice = ""
+	} else {
+		m.toast = ""
+	}
+
+	if m.pendingUndo != nil {
+		u := m.pendingUndo
+		m.pendingUndo = nil
+		if u.needsCreatedCard && msg.selectCardID != nil {
+			u.cmd = m.deleteCardCmd(*msg.selectCardID)
+		}
+		if u.cmd != nil {
+			m.undo = u
+		}
+	}
+
 	// Keep the archive list fresh while it's on screen.
 	if m.showArchive {
-		return m, m.loadArchiveCmd()
+		return m, tea.Batch(cmd, m.loadArchiveCmd())
 	}
-	return m, nil
+	return m, cmd
 }
 
-// archiveSelected moves the selected card into the archive.
-func (m Model) archiveSelected() (tea.Model, tea.Cmd) {
-	if m.svc == nil {
-		return m, nil
+// runUndo reverses the single most recent reversible action.
+func (m Model) runUndo() (tea.Model, tea.Cmd) {
+	if m.undo == nil {
+		return m, m.setToast("nothing to undo")
 	}
-	card, ok := m.selectedCard()
-	if !ok {
-		return m, nil
-	}
-	return m, m.archiveCardCmd(card.ID)
+	u := m.undo
+	m.undo = nil
+	m.pendingNotice = "undid: " + u.desc
+	return m, u.cmd
 }
 
 // startAdding opens the title input for a new card in the current column.
@@ -302,6 +337,7 @@ func (m Model) updateAdding(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		columnID := m.board.Columns[m.colCursor].ID
+		m.pendingUndo = &undoState{desc: "create card", needsCreatedCard: true}
 		return m, m.createCardCmd(columnID, title)
 	}
 
@@ -513,6 +549,10 @@ func (m Model) reorderColumn(dir int) (tea.Model, tea.Cmd) {
 	if newIndex < 0 || newIndex >= len(m.board.Columns) {
 		return m, nil
 	}
+	m.pendingUndo = &undoState{
+		desc: "move column",
+		cmd:  m.moveColumnCmd(m.board.ID, col.ID, m.colCursor),
+	}
 	return m, m.moveColumnCmd(m.board.ID, col.ID, newIndex)
 }
 
@@ -530,6 +570,19 @@ func (m Model) startDelete() (tea.Model, tea.Cmd) {
 		action: m.deleteCardCmd(card.ID),
 	}
 	return m, nil
+}
+
+// archiveSelected moves the selected card into the archive.
+func (m Model) archiveSelected() (tea.Model, tea.Cmd) {
+	if m.svc == nil {
+		return m, nil
+	}
+	card, ok := m.selectedCard()
+	if !ok {
+		return m, nil
+	}
+	m.pendingUndo = &undoState{desc: "archive card", cmd: m.unarchiveCardCmd(card.ID)}
+	return m, m.archiveCardCmd(card.ID)
 }
 
 // updateConfirm handles keys while a yes/no confirmation is pending: "y" (or
@@ -580,7 +633,14 @@ func (m Model) moveCardToColumn(dir int) (tea.Model, tea.Cmd) {
 	if target < 0 || target > m.lastColIndex() {
 		return m, nil
 	}
+	fromCol := m.board.Columns[m.colCursor]
+	fromIndex := realCardIndex(fromCol.Cards, card.ID)
 	toColumn := m.board.Columns[target]
+
+	m.pendingUndo = &undoState{
+		desc: "move card",
+		cmd:  m.moveCardCmd(card.ID, fromCol.ID, fromIndex),
+	}
 	return m, m.moveCardCmd(card.ID, toColumn.ID, len(toColumn.Cards))
 }
 
@@ -602,6 +662,10 @@ func (m Model) reorderCard(dir int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	columnID := m.board.Columns[m.colCursor].ID
+	m.pendingUndo = &undoState{
+		desc: "reorder card",
+		cmd:  m.moveCardCmd(card.ID, columnID, m.cardCursor),
+	}
 	return m, m.moveCardCmd(card.ID, columnID, newIndex)
 }
 

@@ -55,6 +55,17 @@ func parsePositiveInt(s string) (int, error) {
 	return n, nil
 }
 
+// realCardIndex returns the position of the card with id in cards, or the end
+// of the slice when it isn't found.
+func realCardIndex(cards []domain.Card, id int64) int {
+	for i, c := range cards {
+		if c.ID == id {
+			return i
+		}
+	}
+	return len(cards)
+}
+
 // labelPalette is the pool of terminal colours new labels cycle through.
 var labelPalette = []string{"1", "2", "3", "4", "5", "6", "9", "10", "12", "13"}
 
