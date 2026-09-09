@@ -16,8 +16,9 @@ import (
 
 // Model is the root Bubble Tea model for eeban.
 type Model struct {
-	svc   *service.Service
-	board domain.Board
+	svc     *service.Service
+	board   domain.Board
+	boardID int64
 
 	width  int
 	height int
@@ -59,10 +60,11 @@ type confirmState struct {
 // New builds the root model for an already-loaded board.
 func New(svc *service.Service, board domain.Board) Model {
 	return Model{
-		svc:    svc,
-		board:  board,
-		keys:   DefaultKeyMap(),
-		styles: DefaultStyles(),
+		svc:     svc,
+		board:   board,
+		boardID: board.ID,
+		keys:    DefaultKeyMap(),
+		styles:  DefaultStyles(),
 	}
 }
 
@@ -76,24 +78,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 
 	case boardLoadedMsg:
-		if msg.err != nil {
-			m.err = msg.err
-			cmd := m.setToast("error: " + msg.err.Error())
-			return m, cmd
-		}
-		m.err = nil
-		m.toast = ""
-		m.board = msg.board
-		switch {
-		case msg.selectCardID != nil:
-			m.selectCardByID(*msg.selectCardID)
-		case msg.selectColumnID != nil:
-			m.selectColumnByID(*msg.selectColumnID)
-		default:
-			m.colCursor = clamp(m.colCursor, 0, m.lastColIndex())
-			m.clampCardCursor()
-		}
-		return m, nil
+		return m.onBoardLoaded(msg)
 
 	case toastExpiredMsg:
 		if msg.seq == m.toastSeq {
@@ -163,6 +148,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.ColumnRight):
 			return m.reorderColumn(1)
 		}
+	}
+	return m, nil
+}
+
+// onBoardLoaded folds a board reload into the model: it swaps in the fresh
+// board and restores the cursor onto whichever item the mutation touched.
+func (m Model) onBoardLoaded(msg boardLoadedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.err = msg.err
+		return m, m.setToast("error: " + msg.err.Error())
+	}
+
+	m.err = nil
+	m.toast = ""
+	m.board = msg.board
+	m.boardID = msg.board.ID
+
+	switch {
+	case msg.selectCardID != nil:
+		m.selectCardByID(*msg.selectCardID)
+	case msg.selectColumnID != nil:
+		m.selectColumnByID(*msg.selectColumnID)
+	default:
+		m.colCursor = clamp(m.colCursor, 0, m.lastColIndex())
+		m.clampCardCursor()
 	}
 	return m, nil
 }

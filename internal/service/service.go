@@ -28,6 +28,11 @@ func (s *Service) DefaultBoard(ctx context.Context) (domain.Board, error) {
 	return s.db.LoadBoard(ctx, DefaultBoardID)
 }
 
+// Board loads a specific board by id, including its columns and cards.
+func (s *Service) Board(ctx context.Context, id int64) (domain.Board, error) {
+	return s.db.LoadBoard(ctx, id)
+}
+
 // CreateCard adds a new card with just a title to the end of columnID.
 func (s *Service) CreateCard(ctx context.Context, columnID int64, title string) (domain.Card, error) {
 	return s.db.CreateCard(ctx, columnID, title)
