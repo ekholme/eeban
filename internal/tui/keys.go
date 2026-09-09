@@ -25,6 +25,8 @@ type KeyMap struct {
 	ColumnRight  key.Binding
 	WIPLimit     key.Binding
 
+	Search key.Binding
+
 	Help key.Binding
 	Quit key.Binding
 }
@@ -37,7 +39,7 @@ func DefaultKeyMap() KeyMap {
 		Left:        key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h/←", "prev column")),
 		Right:       key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l/→", "next column")),
 		Detail:      key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "toggle detail")),
-		Back:        key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close detail")),
+		Back:        key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close / clear filter")),
 		New:         key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new card")),
 		Edit:        key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit card")),
 		Delete:      key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete card")),
@@ -52,6 +54,8 @@ func DefaultKeyMap() KeyMap {
 		ColumnLeft:   key.NewBinding(key.WithKeys("["), key.WithHelp("[", "reorder column left")),
 		ColumnRight:  key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "reorder column right")),
 		WIPLimit:     key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "set WIP limit")),
+
+		Search: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 
 		Help: key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit: key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),

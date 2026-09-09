@@ -69,19 +69,30 @@ func (m Model) View() string {
 	)
 }
 
-// header renders the board title, with the transient toast pinned to the
-// top-right when one is showing.
+// header renders the board title, an active-filter chip, and the transient
+// toast pinned to the top-right when one is showing.
 func (m Model) header() string {
-	title := m.styles.BoardTitle.Render(m.board.Name)
+	left := m.styles.BoardTitle.Render(m.board.Name)
+	if fc := m.filterChip(); fc != "" {
+		left = lipgloss.JoinHorizontal(lipgloss.Bottom, left, "  ", fc)
+	}
 	if m.toast == "" {
-		return title
+		return left
 	}
 	toast := m.styles.Toast.Render(m.toast)
-	gap := m.width - lipgloss.Width(title) - lipgloss.Width(toast)
+	gap := m.width - lipgloss.Width(left) - lipgloss.Width(toast)
 	if gap < 1 {
-		return lipgloss.JoinVertical(lipgloss.Left, title, toast)
+		return lipgloss.JoinVertical(lipgloss.Left, left, toast)
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, title, strings.Repeat(" ", gap), toast)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", gap), toast)
+}
+
+// filterChip describes the active filter, or "" when none is set.
+func (m Model) filterChip() string {
+	if m.filter == "" {
+		return ""
+	}
+	return m.styles.FilterBar.Render(fmt.Sprintf("filter search:%q · esc clears", m.filter))
 }
 
 // helpView renders the full-screen keybinding overlay.
@@ -127,6 +138,8 @@ func (m Model) footer() string {
 	case m.settingWIP:
 		col := m.board.Columns[m.colCursor].Name
 		return m.styles.Prompt.Render(fmt.Sprintf("WIP limit for %s: ", col)) + m.wipInput.View()
+	case m.filtering:
+		return m.styles.Prompt.Render("Search: ") + m.filterInput.View()
 	case m.editing:
 		return m.styles.Help.Render("tab/shift+tab field · ←/→ priority · ctrl+s save · esc cancel")
 	case m.confirm != nil:
@@ -242,11 +255,15 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 	b.WriteString(titleStyle.Render(fmt.Sprintf("%s  %s", col.Name, count)))
 	b.WriteByte('\n')
 
-	if len(col.Cards) == 0 {
+	cards := m.visibleCards(col)
+	switch {
+	case len(col.Cards) == 0:
 		b.WriteString(m.styles.Empty.Render("(empty)"))
+	case len(cards) == 0:
+		b.WriteString(m.styles.Empty.Render("(no matches)"))
 	}
 	now := time.Now()
-	for j, card := range col.Cards {
+	for j, card := range cards {
 		style := m.styles.Card
 		if active && j == m.cardCursor {
 			style = m.styles.CardActive
@@ -256,7 +273,7 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 			cell = lipgloss.JoinVertical(lipgloss.Left, card.Title, tag)
 		}
 		b.WriteString(style.Width(width - 3).Render(cell))
-		if j < len(col.Cards)-1 {
+		if j < len(cards)-1 {
 			b.WriteByte('\n')
 		}
 	}

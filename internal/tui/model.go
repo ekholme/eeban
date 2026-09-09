@@ -41,6 +41,10 @@ type Model struct {
 	settingWIP bool // numeric input active for the current column's WIP limit
 	wipInput   textinput.Model
 
+	filtering   bool // search input active
+	filterInput textinput.Model
+	filter      string // committed fuzzy query over title + body
+
 	err error // last mutation error, surfaced as a toast
 
 	toast    string // transient notification text, "" when hidden
@@ -109,6 +113,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.settingWIP {
 			return m.updateWIPInput(msg)
 		}
+		if m.filtering {
+			return m.updateFiltering(msg)
+		}
 		return m.updateBoard(msg)
 	}
 	return m, nil
@@ -134,7 +141,14 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Detail):
 		m.showDetail = !m.showDetail
 	case key.Matches(msg, m.keys.Back):
+		if m.filterActive() {
+			m.filter = ""
+			m.clampToFilter()
+			return m, nil
+		}
 		m.showDetail = false
+	case key.Matches(msg, m.keys.Search):
+		return m.startFiltering()
 	case key.Matches(msg, m.keys.New):
 		return m.startAdding()
 	case key.Matches(msg, m.keys.Edit):
@@ -368,6 +382,42 @@ func (m Model) updateWIPInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// startFiltering opens the fuzzy-search input, seeded with the active query.
+func (m Model) startFiltering() (tea.Model, tea.Cmd) {
+	ti := textinput.New()
+	ti.Placeholder = "fuzzy search title + body"
+	ti.CharLimit = 100
+	ti.SetValue(m.filter)
+	ti.CursorEnd()
+	ti.Focus()
+	m.filterInput = ti
+	m.filtering = true
+	return m, textinput.Blink
+}
+
+// updateFiltering routes keys to the search input, committing the query live
+// so the board narrows as you type.
+func (m Model) updateFiltering(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.filtering = false
+		m.filter = ""
+		m.clampToFilter()
+		return m, nil
+	case tea.KeyEnter:
+		m.filtering = false
+		m.filter = strings.TrimSpace(m.filterInput.Value())
+		m.clampToFilter()
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.filterInput, cmd = m.filterInput.Update(msg)
+	m.filter = strings.TrimSpace(m.filterInput.Value())
+	m.clampToFilter()
+	return m, cmd
+}
+
 // startDeleteColumn asks to confirm removing the current column and its cards.
 func (m Model) startDeleteColumn() (tea.Model, tea.Cmd) {
 	if m.svc == nil || len(m.board.Columns) == 0 {
@@ -469,6 +519,9 @@ func (m Model) reorderCard(dir int) (tea.Model, tea.Cmd) {
 	if m.svc == nil {
 		return m, nil
 	}
+	if m.filterActive() {
+		return m, m.setToast("clear the filter to reorder cards")
+	}
 	card, ok := m.selectedCard()
 	if !ok {
 		return m, nil
@@ -482,10 +535,10 @@ func (m Model) reorderCard(dir int) (tea.Model, tea.Cmd) {
 }
 
 // selectCardByID moves the cursor onto the card with the given id, if it is
-// still present after a reload.
+// still present (and visible under the active filter) after a reload.
 func (m *Model) selectCardByID(id int64) {
 	for ci, col := range m.board.Columns {
-		for cj, c := range col.Cards {
+		for cj, c := range m.visibleCards(col) {
 			if c.ID == id {
 				m.colCursor, m.cardCursor = ci, cj
 				return
@@ -514,11 +567,32 @@ func (m Model) lastColIndex() int {
 	return len(m.board.Columns) - 1
 }
 
+// filterActive reports whether any filter is narrowing the board.
+func (m Model) filterActive() bool {
+	return m.filter != ""
+}
+
+// visibleCards returns col's cards after applying the active text filter. With
+// no filter it returns the column's cards unchanged.
+func (m Model) visibleCards(col domain.Column) []domain.Card {
+	if !m.filterActive() {
+		return col.Cards
+	}
+	out := make([]domain.Card, 0, len(col.Cards))
+	for _, c := range col.Cards {
+		if !c.CardMatches(m.filter) {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
 func (m Model) currentCards() []domain.Card {
 	if m.colCursor < 0 || m.colCursor >= len(m.board.Columns) {
 		return nil
 	}
-	return m.board.Columns[m.colCursor].Cards
+	return m.visibleCards(m.board.Columns[m.colCursor])
 }
 
 func (m Model) lastCardIndex() int {
@@ -526,7 +600,7 @@ func (m Model) lastCardIndex() int {
 }
 
 // selectedCard returns the card under the cursor, or false when the current
-// column is empty.
+// column has no visible cards.
 func (m Model) selectedCard() (domain.Card, bool) {
 	cards := m.currentCards()
 	if m.cardCursor < 0 || m.cardCursor >= len(cards) {
@@ -537,4 +611,10 @@ func (m Model) selectedCard() (domain.Card, bool) {
 
 func (m *Model) clampCardCursor() {
 	m.cardCursor = clamp(m.cardCursor, 0, max(m.lastCardIndex(), 0))
+}
+
+// clampToFilter re-homes both cursors after the visible set changes.
+func (m *Model) clampToFilter() {
+	m.colCursor = clamp(m.colCursor, 0, max(m.lastColIndex(), 0))
+	m.clampCardCursor()
 }
