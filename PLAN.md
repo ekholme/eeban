@@ -75,13 +75,13 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 - [x] Every mutation persisted immediately
 
 ### v1
-- [ ] Labels with colors; filter by label
-- [ ] Fuzzy search / filter across title + body
-- [ ] Due-date highlighting (overdue / due soon)
-- [ ] WIP limits with warning styling
-- [ ] Archive view for done cards
-- [ ] Multiple boards + board switcher
-- [ ] Single-step undo (in-memory command stack, or replay from `card_events`)
+- [x] Labels with colors; filter by label (`t` picker, `f` filters by the highlighted label)
+- [x] Fuzzy search / filter across title + body (`/`, live subsequence match)
+- [x] Due-date highlighting (overdue / due soon) — `domain.DueStatusFor`
+- [x] WIP limits with warning styling (`w` sets a column limit; over-limit columns turn amber)
+- [x] Archive view for done cards (`a` archives, `A` opens the list, `r` restores)
+- [x] Multiple boards + board switcher (`b`: switch / create / rename / delete)
+- [x] Single-step undo (`u`) — in-memory, covers create / move / reorder / archive
 
 ### Later
 - [ ] `$EDITOR` integration for card bodies
@@ -101,7 +101,7 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 6. **Column management.** ✅
 7. **Card form + detail pane** — Bubbles `textinput` / `textarea`, nested model + focus. ✅ (detail pane, title quick-add, full body/priority/due-date edit form via `e`)
 8. **Help, confirms, toasts, styling pass.** ✅
-9. **Iterate on v1.**
+9. **Iterate on v1.** ✅ (labels, search, due dates, WIP, archive, multi-board, undo)
 
 ## Risks / decisions to nail early
 
