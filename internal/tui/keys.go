@@ -23,6 +23,7 @@ type KeyMap struct {
 	DeleteColumn key.Binding
 	ColumnLeft   key.Binding
 	ColumnRight  key.Binding
+	WIPLimit     key.Binding
 
 	Help key.Binding
 	Quit key.Binding
@@ -50,6 +51,7 @@ func DefaultKeyMap() KeyMap {
 		DeleteColumn: key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "delete column")),
 		ColumnLeft:   key.NewBinding(key.WithKeys("["), key.WithHelp("[", "reorder column left")),
 		ColumnRight:  key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "reorder column right")),
+		WIPLimit:     key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "set WIP limit")),
 
 		Help: key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit: key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),

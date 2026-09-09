@@ -85,6 +85,17 @@ func (m Model) moveCardCmd(cardID, toColumnID int64, toIndex int) tea.Cmd {
 	}
 }
 
+func (m Model) setColumnWIPCmd(columnID int64, limit *int) tea.Cmd {
+	svc, boardID := m.svc, m.boardID
+	return func() tea.Msg {
+		ctx := context.Background()
+		if err := svc.SetColumnWIP(ctx, columnID, limit); err != nil {
+			return boardLoadedMsg{err: err}
+		}
+		return loadBoardMsg(svc, boardID, nil, &columnID)
+	}
+}
+
 func (m Model) createColumnCmd(boardID int64, name string) tea.Cmd {
 	svc := m.svc
 	return func() tea.Msg {

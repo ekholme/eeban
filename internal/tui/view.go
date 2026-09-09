@@ -124,6 +124,9 @@ func (m Model) footer() string {
 		return m.styles.Prompt.Render("New column: ") + m.columnInput.View()
 	case m.renamingColumn:
 		return m.styles.Prompt.Render("Rename column: ") + m.columnInput.View()
+	case m.settingWIP:
+		col := m.board.Columns[m.colCursor].Name
+		return m.styles.Prompt.Render(fmt.Sprintf("WIP limit for %s: ", col)) + m.wipInput.View()
 	case m.editing:
 		return m.styles.Help.Render("tab/shift+tab field · ←/→ priority · ctrl+s save · esc cancel")
 	case m.confirm != nil:
@@ -232,7 +235,11 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 	if col.WIPLimit != nil {
 		count = fmt.Sprintf("%d/%d", len(col.Cards), *col.WIPLimit)
 	}
-	b.WriteString(m.styles.ColumnTitle.Render(fmt.Sprintf("%s  %s", col.Name, count)))
+	titleStyle := m.styles.ColumnTitle
+	if col.OverWIP() {
+		titleStyle = m.styles.ColumnTitleWarn
+	}
+	b.WriteString(titleStyle.Render(fmt.Sprintf("%s  %s", col.Name, count)))
 	b.WriteByte('\n')
 
 	if len(col.Cards) == 0 {
@@ -255,8 +262,11 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 	}
 
 	frame := m.styles.Column
-	if active {
+	switch {
+	case active:
 		frame = m.styles.ColumnActive
+	case col.OverWIP():
+		frame = m.styles.ColumnWarn
 	}
 	return frame.Width(width).Height(height).MaxHeight(height + 2).Render(b.String())
 }

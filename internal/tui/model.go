@@ -38,6 +38,9 @@ type Model struct {
 	renamingColumn bool // name input active for renaming the current column
 	columnInput    textinput.Model
 
+	settingWIP bool // numeric input active for the current column's WIP limit
+	wipInput   textinput.Model
+
 	err error // last mutation error, surfaced as a toast
 
 	toast    string // transient notification text, "" when hidden
@@ -103,51 +106,61 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.addingColumn || m.renamingColumn {
 			return m.updateColumnInput(msg)
 		}
-
-		switch {
-		case key.Matches(msg, m.keys.Quit):
-			return m, tea.Quit
-		case key.Matches(msg, m.keys.Help):
-			m.showHelp = true
-		case key.Matches(msg, m.keys.Left):
-			m.colCursor = clamp(m.colCursor-1, 0, m.lastColIndex())
-			m.clampCardCursor()
-		case key.Matches(msg, m.keys.Right):
-			m.colCursor = clamp(m.colCursor+1, 0, m.lastColIndex())
-			m.clampCardCursor()
-		case key.Matches(msg, m.keys.Up):
-			m.cardCursor = clamp(m.cardCursor-1, 0, m.lastCardIndex())
-		case key.Matches(msg, m.keys.Down):
-			m.cardCursor = clamp(m.cardCursor+1, 0, m.lastCardIndex())
-		case key.Matches(msg, m.keys.Detail):
-			m.showDetail = !m.showDetail
-		case key.Matches(msg, m.keys.Back):
-			m.showDetail = false
-		case key.Matches(msg, m.keys.New):
-			return m.startAdding()
-		case key.Matches(msg, m.keys.Edit):
-			return m.startEdit()
-		case key.Matches(msg, m.keys.Delete):
-			return m.startDelete()
-		case key.Matches(msg, m.keys.MoveLeft):
-			return m.moveCardToColumn(-1)
-		case key.Matches(msg, m.keys.MoveRight):
-			return m.moveCardToColumn(1)
-		case key.Matches(msg, m.keys.ReorderUp):
-			return m.reorderCard(-1)
-		case key.Matches(msg, m.keys.ReorderDown):
-			return m.reorderCard(1)
-		case key.Matches(msg, m.keys.NewColumn):
-			return m.startAddingColumn()
-		case key.Matches(msg, m.keys.RenameColumn):
-			return m.startRenamingColumn()
-		case key.Matches(msg, m.keys.DeleteColumn):
-			return m.startDeleteColumn()
-		case key.Matches(msg, m.keys.ColumnLeft):
-			return m.reorderColumn(-1)
-		case key.Matches(msg, m.keys.ColumnRight):
-			return m.reorderColumn(1)
+		if m.settingWIP {
+			return m.updateWIPInput(msg)
 		}
+		return m.updateBoard(msg)
+	}
+	return m, nil
+}
+
+// updateBoard handles keys on the main board view.
+func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Quit):
+		return m, tea.Quit
+	case key.Matches(msg, m.keys.Help):
+		m.showHelp = true
+	case key.Matches(msg, m.keys.Left):
+		m.colCursor = clamp(m.colCursor-1, 0, m.lastColIndex())
+		m.clampCardCursor()
+	case key.Matches(msg, m.keys.Right):
+		m.colCursor = clamp(m.colCursor+1, 0, m.lastColIndex())
+		m.clampCardCursor()
+	case key.Matches(msg, m.keys.Up):
+		m.cardCursor = clamp(m.cardCursor-1, 0, m.lastCardIndex())
+	case key.Matches(msg, m.keys.Down):
+		m.cardCursor = clamp(m.cardCursor+1, 0, m.lastCardIndex())
+	case key.Matches(msg, m.keys.Detail):
+		m.showDetail = !m.showDetail
+	case key.Matches(msg, m.keys.Back):
+		m.showDetail = false
+	case key.Matches(msg, m.keys.New):
+		return m.startAdding()
+	case key.Matches(msg, m.keys.Edit):
+		return m.startEdit()
+	case key.Matches(msg, m.keys.Delete):
+		return m.startDelete()
+	case key.Matches(msg, m.keys.MoveLeft):
+		return m.moveCardToColumn(-1)
+	case key.Matches(msg, m.keys.MoveRight):
+		return m.moveCardToColumn(1)
+	case key.Matches(msg, m.keys.ReorderUp):
+		return m.reorderCard(-1)
+	case key.Matches(msg, m.keys.ReorderDown):
+		return m.reorderCard(1)
+	case key.Matches(msg, m.keys.NewColumn):
+		return m.startAddingColumn()
+	case key.Matches(msg, m.keys.RenameColumn):
+		return m.startRenamingColumn()
+	case key.Matches(msg, m.keys.DeleteColumn):
+		return m.startDeleteColumn()
+	case key.Matches(msg, m.keys.WIPLimit):
+		return m.startSettingWIP()
+	case key.Matches(msg, m.keys.ColumnLeft):
+		return m.reorderColumn(-1)
+	case key.Matches(msg, m.keys.ColumnRight):
+		return m.reorderColumn(1)
 	}
 	return m, nil
 }
@@ -305,6 +318,53 @@ func (m Model) updateColumnInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.columnInput, cmd = m.columnInput.Update(msg)
+	return m, cmd
+}
+
+// startSettingWIP opens the numeric input for the current column's WIP limit.
+func (m Model) startSettingWIP() (tea.Model, tea.Cmd) {
+	if m.svc == nil || len(m.board.Columns) == 0 {
+		return m, nil
+	}
+	ti := textinput.New()
+	ti.Placeholder = "WIP limit (blank clears)"
+	ti.CharLimit = 3
+	if lim := m.board.Columns[m.colCursor].WIPLimit; lim != nil {
+		ti.SetValue(fmt.Sprintf("%d", *lim))
+		ti.CursorEnd()
+	}
+	ti.Focus()
+	m.wipInput = ti
+	m.settingWIP = true
+	return m, textinput.Blink
+}
+
+// updateWIPInput routes keys to the WIP limit input. Enter commits; a blank
+// or zero value clears the limit; a non-number is rejected with a toast.
+func (m Model) updateWIPInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.settingWIP = false
+		return m, nil
+	case tea.KeyEnter:
+		raw := strings.TrimSpace(m.wipInput.Value())
+		m.settingWIP = false
+		columnID := m.board.Columns[m.colCursor].ID
+		if raw == "" {
+			return m, m.setColumnWIPCmd(columnID, nil)
+		}
+		n, err := parsePositiveInt(raw)
+		if err != nil {
+			return m, m.setToast("WIP limit must be a number")
+		}
+		if n == 0 {
+			return m, m.setColumnWIPCmd(columnID, nil)
+		}
+		return m, m.setColumnWIPCmd(columnID, &n)
+	}
+
+	var cmd tea.Cmd
+	m.wipInput, cmd = m.wipInput.Update(msg)
 	return m, cmd
 }
 

@@ -54,6 +54,11 @@ func (s *Service) MoveCard(ctx context.Context, cardID, toColumnID int64, toInde
 	return s.db.MoveCard(ctx, cardID, toColumnID, toIndex)
 }
 
+// SetColumnWIP sets or (with a nil limit) clears a column's WIP limit.
+func (s *Service) SetColumnWIP(ctx context.Context, id int64, limit *int) error {
+	return s.db.SetColumnWIP(ctx, id, limit)
+}
+
 // CreateColumn adds a new column to the end of boardID.
 func (s *Service) CreateColumn(ctx context.Context, boardID int64, name string) (domain.Column, error) {
 	return s.db.CreateColumn(ctx, boardID, name)

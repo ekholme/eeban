@@ -31,6 +31,12 @@ type Column struct {
 	Cards    []Card
 }
 
+// OverWIP reports whether the column holds more cards than its WIP limit
+// allows. A column with no limit is never over.
+func (c Column) OverWIP() bool {
+	return c.WIPLimit != nil && len(c.Cards) > *c.WIPLimit
+}
+
 // Card is a single work item within a column.
 type Card struct {
 	ID       int64

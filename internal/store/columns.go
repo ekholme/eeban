@@ -41,6 +41,12 @@ func (db *DB) RenameColumn(ctx context.Context, id int64, name string) error {
 	return err
 }
 
+// SetColumnWIP sets a column's WIP limit, or clears it when limit is nil.
+func (db *DB) SetColumnWIP(ctx context.Context, id int64, limit *int) error {
+	_, err := db.ExecContext(ctx, `UPDATE columns SET wip_limit = ? WHERE id = ?`, limit, id)
+	return err
+}
+
 // DeleteColumn permanently removes a column; its cards go with it via
 // ON DELETE CASCADE.
 func (db *DB) DeleteColumn(ctx context.Context, id int64) error {

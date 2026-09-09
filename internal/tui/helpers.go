@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/ekholme/eeban/internal/domain"
+import (
+	"strconv"
+
+	"github.com/ekholme/eeban/internal/domain"
+)
 
 func clamp(v, lo, hi int) int {
 	if v < lo {
@@ -37,4 +41,16 @@ func priorityLabel(p int) string {
 	default:
 		return "None"
 	}
+}
+
+// parsePositiveInt parses s as a non-negative base-10 integer.
+func parsePositiveInt(s string) (int, error) {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+	if n < 0 {
+		return 0, strconv.ErrRange
+	}
+	return n, nil
 }
