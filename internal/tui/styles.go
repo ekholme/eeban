@@ -19,6 +19,8 @@ type Styles struct {
 	DetailDim    lipgloss.Style
 	Prompt       lipgloss.Style
 	Toast        lipgloss.Style
+	DueSoon      lipgloss.Style
+	DueOverdue   lipgloss.Style
 	HelpOverlay  lipgloss.Style
 	HelpHeading  lipgloss.Style
 	HelpGroup    lipgloss.Style
@@ -63,6 +65,11 @@ func DefaultStyles() Styles {
 			Padding(0, 1).
 			Foreground(lipgloss.Color("231")).
 			Background(lipgloss.AdaptiveColor{Light: "160", Dark: "124"}),
+		DueSoon: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "166", Dark: "214"}),
+		DueOverdue: lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "160", Dark: "203"}).
+			Bold(true),
 		HelpOverlay: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(accent).

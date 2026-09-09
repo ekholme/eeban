@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
@@ -159,11 +160,7 @@ func (m Model) renderDetail(width, height int) string {
 	b.WriteByte('\n')
 
 	b.WriteString(m.styles.DetailLabel.Render("Due       "))
-	if card.DueDate != nil && *card.DueDate != "" {
-		b.WriteString(*card.DueDate)
-	} else {
-		b.WriteString(m.styles.DetailDim.Render("—"))
-	}
+	b.WriteString(m.renderDue(card))
 
 	if card.Body != "" {
 		b.WriteString(m.styles.DetailBody.Width(inner).Render(card.Body))
@@ -172,6 +169,21 @@ func (m Model) renderDetail(width, height int) string {
 	}
 
 	return frame.Render(b.String())
+}
+
+// renderDue formats a card's due date, coloured by how close (or overdue) it is.
+func (m Model) renderDue(card domain.Card) string {
+	if card.DueDate == nil || *card.DueDate == "" {
+		return m.styles.DetailDim.Render("—")
+	}
+	switch domain.DueStatusFor(card.DueDate, time.Now()) {
+	case domain.DueOverdue:
+		return m.styles.DueOverdue.Render(*card.DueDate + " (overdue)")
+	case domain.DueSoon:
+		return m.styles.DueSoon.Render(*card.DueDate + " (soon)")
+	default:
+		return *card.DueDate
+	}
 }
 
 // renderEditForm draws the card edit form: title, body, priority, due date.
@@ -226,12 +238,17 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 	if len(col.Cards) == 0 {
 		b.WriteString(m.styles.Empty.Render("(empty)"))
 	}
+	now := time.Now()
 	for j, card := range col.Cards {
 		style := m.styles.Card
 		if active && j == m.cardCursor {
 			style = m.styles.CardActive
 		}
-		b.WriteString(style.Width(width - 3).Render(card.Title))
+		cell := card.Title
+		if tag := m.dueTag(card, now); tag != "" {
+			cell = lipgloss.JoinVertical(lipgloss.Left, card.Title, tag)
+		}
+		b.WriteString(style.Width(width - 3).Render(cell))
 		if j < len(col.Cards)-1 {
 			b.WriteByte('\n')
 		}
@@ -242,4 +259,17 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 		frame = m.styles.ColumnActive
 	}
 	return frame.Width(width).Height(height).MaxHeight(height + 2).Render(b.String())
+}
+
+// dueTag returns a short coloured due-date marker for the compact card view,
+// or "" when the card is not due soon or overdue.
+func (m Model) dueTag(card domain.Card, now time.Time) string {
+	switch domain.DueStatusFor(card.DueDate, now) {
+	case domain.DueOverdue:
+		return m.styles.DueOverdue.Render("⏰ overdue")
+	case domain.DueSoon:
+		return m.styles.DueSoon.Render("⏰ due soon")
+	default:
+		return ""
+	}
 }
