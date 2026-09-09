@@ -27,6 +27,9 @@ func (m Model) View() string {
 	if m.showHelp {
 		return m.helpView()
 	}
+	if m.labelPicker {
+		return m.labelPickerView()
+	}
 	if len(m.board.Columns) == 0 {
 		return lipgloss.JoinVertical(lipgloss.Left,
 			m.header(),
@@ -87,12 +90,26 @@ func (m Model) header() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", gap), toast)
 }
 
-// filterChip describes the active filter, or "" when none is set.
+// filterChip describes the active filter(s), or "" when none is set.
 func (m Model) filterChip() string {
-	if m.filter == "" {
+	var parts []string
+	if m.filter != "" {
+		parts = append(parts, fmt.Sprintf("search:%q", m.filter))
+	}
+	if m.filterLabel != 0 {
+		name := fmt.Sprintf("#%d", m.filterLabel)
+		for _, l := range m.board.Labels {
+			if l.ID == m.filterLabel {
+				name = l.Name
+				break
+			}
+		}
+		parts = append(parts, "label:"+name)
+	}
+	if len(parts) == 0 {
 		return ""
 	}
-	return m.styles.FilterBar.Render(fmt.Sprintf("filter search:%q · esc clears", m.filter))
+	return m.styles.FilterBar.Render("filter " + strings.Join(parts, " ") + " · esc clears")
 }
 
 // helpView renders the full-screen keybinding overlay.
@@ -177,6 +194,14 @@ func (m Model) renderDetail(width, height int) string {
 
 	b.WriteString(m.styles.DetailLabel.Render("Due       "))
 	b.WriteString(m.renderDue(card))
+	b.WriteByte('\n')
+
+	b.WriteString(m.styles.DetailLabel.Render("Labels    "))
+	if chips := m.renderLabelChips(card.Labels); chips != "" {
+		b.WriteString(chips)
+	} else {
+		b.WriteString(m.styles.DetailDim.Render("—"))
+	}
 
 	if card.Body != "" {
 		b.WriteString(m.styles.DetailBody.Width(inner).Render(card.Body))
@@ -268,9 +293,13 @@ func (m Model) renderColumn(col domain.Column, width, height int, active bool) s
 		if active && j == m.cardCursor {
 			style = m.styles.CardActive
 		}
-		cell := card.Title
+		title := card.Title
+		if dots := m.renderLabelDots(card.Labels); dots != "" {
+			title += " " + dots
+		}
+		cell := title
 		if tag := m.dueTag(card, now); tag != "" {
-			cell = lipgloss.JoinVertical(lipgloss.Left, card.Title, tag)
+			cell = lipgloss.JoinVertical(lipgloss.Left, title, tag)
 		}
 		b.WriteString(style.Width(width - 3).Render(cell))
 		if j < len(cards)-1 {

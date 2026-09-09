@@ -54,3 +54,14 @@ func parsePositiveInt(s string) (int, error) {
 	}
 	return n, nil
 }
+
+// labelPalette is the pool of terminal colours new labels cycle through.
+var labelPalette = []string{"1", "2", "3", "4", "5", "6", "9", "10", "12", "13"}
+
+// nextLabelColor picks a palette colour for the nth label defined on a board.
+func nextLabelColor(n int) string {
+	if len(labelPalette) == 0 {
+		return "63"
+	}
+	return labelPalette[n%len(labelPalette)]
+}

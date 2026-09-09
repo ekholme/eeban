@@ -59,6 +59,21 @@ func (s *Service) SetColumnWIP(ctx context.Context, id int64, limit *int) error 
 	return s.db.SetColumnWIP(ctx, id, limit)
 }
 
+// CreateLabel defines a new coloured label on a board.
+func (s *Service) CreateLabel(ctx context.Context, boardID int64, name, color string) (domain.Label, error) {
+	return s.db.CreateLabel(ctx, boardID, name, color)
+}
+
+// DeleteLabel removes a label from a board and every card that carried it.
+func (s *Service) DeleteLabel(ctx context.Context, id int64) error {
+	return s.db.DeleteLabel(ctx, id)
+}
+
+// SetCardLabel attaches (on) or detaches (off) a label from a card.
+func (s *Service) SetCardLabel(ctx context.Context, cardID, labelID int64, on bool) error {
+	return s.db.SetCardLabel(ctx, cardID, labelID, on)
+}
+
 // CreateColumn adds a new column to the end of boardID.
 func (s *Service) CreateColumn(ctx context.Context, boardID int64, name string) (domain.Column, error) {
 	return s.db.CreateColumn(ctx, boardID, name)

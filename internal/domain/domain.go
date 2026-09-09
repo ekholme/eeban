@@ -14,11 +14,13 @@ const (
 // moving an item only rewrites a single row's position.
 const PositionGap = 1000
 
-// Board is a single kanban board together with its ordered columns.
+// Board is a single kanban board together with its ordered columns and the
+// labels defined for it.
 type Board struct {
 	ID      int64
 	Name    string
 	Columns []Column
+	Labels  []Label
 }
 
 // Column is a vertical lane on a board holding an ordered list of cards.
@@ -46,4 +48,23 @@ type Card struct {
 	Position int64
 	Priority int
 	DueDate  *string // RFC3339 date, nil when unset
+	Labels   []Label
+}
+
+// HasLabel reports whether the card carries the label with the given id.
+func (c Card) HasLabel(labelID int64) bool {
+	for _, l := range c.Labels {
+		if l.ID == labelID {
+			return true
+		}
+	}
+	return false
+}
+
+// Label is a coloured tag that can be attached to any card on a board.
+type Label struct {
+	ID      int64
+	BoardID int64
+	Name    string
+	Color   string // terminal colour code, e.g. "63"
 }

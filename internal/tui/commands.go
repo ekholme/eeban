@@ -96,6 +96,39 @@ func (m Model) setColumnWIPCmd(columnID int64, limit *int) tea.Cmd {
 	}
 }
 
+func (m Model) createLabelCmd(name, color string) tea.Cmd {
+	svc, boardID := m.svc, m.boardID
+	return func() tea.Msg {
+		ctx := context.Background()
+		if _, err := svc.CreateLabel(ctx, boardID, name, color); err != nil {
+			return boardLoadedMsg{err: err}
+		}
+		return loadBoardMsg(svc, boardID, nil, nil)
+	}
+}
+
+func (m Model) deleteLabelCmd(labelID int64) tea.Cmd {
+	svc, boardID := m.svc, m.boardID
+	return func() tea.Msg {
+		ctx := context.Background()
+		if err := svc.DeleteLabel(ctx, labelID); err != nil {
+			return boardLoadedMsg{err: err}
+		}
+		return loadBoardMsg(svc, boardID, nil, nil)
+	}
+}
+
+func (m Model) setCardLabelCmd(cardID, labelID int64, on bool) tea.Cmd {
+	svc, boardID := m.svc, m.boardID
+	return func() tea.Msg {
+		ctx := context.Background()
+		if err := svc.SetCardLabel(ctx, cardID, labelID, on); err != nil {
+			return boardLoadedMsg{err: err}
+		}
+		return loadBoardMsg(svc, boardID, &cardID, nil)
+	}
+}
+
 func (m Model) createColumnCmd(boardID int64, name string) tea.Cmd {
 	svc := m.svc
 	return func() tea.Msg {

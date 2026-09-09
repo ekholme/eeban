@@ -44,6 +44,12 @@ type Model struct {
 	filtering   bool // search input active
 	filterInput textinput.Model
 	filter      string // committed fuzzy query over title + body
+	filterLabel int64  // when non-zero, only cards carrying this label show
+
+	labelPicker    bool // label overlay open for the selected card
+	labelCursor    int
+	labelNaming    bool // sub-input: name for a new label
+	labelNameInput textinput.Model
 
 	err error // last mutation error, surfaced as a toast
 
@@ -116,6 +122,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.filtering {
 			return m.updateFiltering(msg)
 		}
+		if m.labelPicker {
+			return m.updateLabelPicker(msg)
+		}
 		return m.updateBoard(msg)
 	}
 	return m, nil
@@ -143,10 +152,13 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Back):
 		if m.filterActive() {
 			m.filter = ""
+			m.filterLabel = 0
 			m.clampToFilter()
 			return m, nil
 		}
 		m.showDetail = false
+	case key.Matches(msg, m.keys.Labels):
+		return m.openLabelPicker()
 	case key.Matches(msg, m.keys.Search):
 		return m.startFiltering()
 	case key.Matches(msg, m.keys.New):
@@ -569,17 +581,20 @@ func (m Model) lastColIndex() int {
 
 // filterActive reports whether any filter is narrowing the board.
 func (m Model) filterActive() bool {
-	return m.filter != ""
+	return m.filter != "" || m.filterLabel != 0
 }
 
-// visibleCards returns col's cards after applying the active text filter. With
-// no filter it returns the column's cards unchanged.
+// visibleCards returns col's cards after applying the active text and label
+// filters. With no filter it returns the column's cards unchanged.
 func (m Model) visibleCards(col domain.Column) []domain.Card {
 	if !m.filterActive() {
 		return col.Cards
 	}
 	out := make([]domain.Card, 0, len(col.Cards))
 	for _, c := range col.Cards {
+		if m.filterLabel != 0 && !c.HasLabel(m.filterLabel) {
+			continue
+		}
 		if !c.CardMatches(m.filter) {
 			continue
 		}

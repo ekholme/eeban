@@ -7,7 +7,8 @@ import (
 )
 
 // LoadBoard returns the board with the given id including its columns and their
-// cards, each ordered by position. Archived cards are excluded.
+// cards, each ordered by position, plus the labels defined for the board.
+// Archived cards are excluded.
 func (db *DB) LoadBoard(ctx context.Context, id int64) (domain.Board, error) {
 	var b domain.Board
 	err := db.QueryRowContext(ctx,
@@ -16,6 +17,12 @@ func (db *DB) LoadBoard(ctx context.Context, id int64) (domain.Board, error) {
 	if err != nil {
 		return domain.Board{}, err
 	}
+
+	labels, err := db.loadLabels(ctx, id)
+	if err != nil {
+		return domain.Board{}, err
+	}
+	b.Labels = labels
 
 	cols, err := db.loadColumns(ctx, id)
 	if err != nil {
@@ -64,6 +71,9 @@ func (db *DB) loadColumns(ctx context.Context, boardID int64) ([]domain.Column, 
 	}
 	defer crows.Close()
 
+	// cardLoc maps a card id to its (column index, card index) so a later
+	// labels pass can attach rows without re-walking every column.
+	cardLoc := make(map[int64][2]int)
 	for crows.Next() {
 		var c domain.Card
 		if err := crows.Scan(
@@ -72,8 +82,54 @@ func (db *DB) loadColumns(ctx context.Context, boardID int64) ([]domain.Column, 
 			return nil, err
 		}
 		if idx, ok := indexByID[c.ColumnID]; ok {
+			cardLoc[c.ID] = [2]int{idx, len(cols[idx].Cards)}
 			cols[idx].Cards = append(cols[idx].Cards, c)
 		}
 	}
-	return cols, crows.Err()
+	if err := crows.Err(); err != nil {
+		return nil, err
+	}
+
+	lrows, err := db.QueryContext(ctx,
+		`SELECT cl.card_id, l.id, l.board_id, l.name, l.color
+		   FROM card_labels cl
+		   JOIN labels l ON l.id = cl.label_id
+		  WHERE l.board_id = ?
+		  ORDER BY l.name`, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer lrows.Close()
+
+	for lrows.Next() {
+		var cardID int64
+		var l domain.Label
+		if err := lrows.Scan(&cardID, &l.ID, &l.BoardID, &l.Name, &l.Color); err != nil {
+			return nil, err
+		}
+		if loc, ok := cardLoc[cardID]; ok {
+			cols[loc[0]].Cards[loc[1]].Labels = append(cols[loc[0]].Cards[loc[1]].Labels, l)
+		}
+	}
+	return cols, lrows.Err()
+}
+
+// loadLabels returns every label defined for boardID, ordered by name.
+func (db *DB) loadLabels(ctx context.Context, boardID int64) ([]domain.Label, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, board_id, name, color FROM labels WHERE board_id = ? ORDER BY name`, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var labels []domain.Label
+	for rows.Next() {
+		var l domain.Label
+		if err := rows.Scan(&l.ID, &l.BoardID, &l.Name, &l.Color); err != nil {
+			return nil, err
+		}
+		labels = append(labels, l)
+	}
+	return labels, rows.Err()
 }
