@@ -51,6 +51,106 @@ func (db *DB) DeleteCard(ctx context.Context, id int64) error {
 	return err
 }
 
+// ArchiveCard marks a card archived, removing it from the board view while
+// keeping its row (and label links) intact.
+func (db *DB) ArchiveCard(ctx context.Context, id int64) error {
+	_, err := db.ExecContext(ctx,
+		`UPDATE cards SET archived_at = datetime('now'), updated_at = datetime('now')
+		  WHERE id = ? AND archived_at IS NULL`, id)
+	return err
+}
+
+// UnarchiveCard clears a card's archived flag and drops it at the end of its
+// original column.
+func (db *DB) UnarchiveCard(ctx context.Context, id int64) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var columnID int64
+	if err := tx.QueryRowContext(ctx,
+		`SELECT column_id FROM cards WHERE id = ?`, id).Scan(&columnID); err != nil {
+		return err
+	}
+
+	var maxPos sql.NullInt64
+	if err := tx.QueryRowContext(ctx,
+		`SELECT MAX(position) FROM cards WHERE column_id = ? AND archived_at IS NULL`, columnID,
+	).Scan(&maxPos); err != nil {
+		return err
+	}
+	pos := int64(domain.PositionGap)
+	if maxPos.Valid {
+		pos = maxPos.Int64 + domain.PositionGap
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE cards SET archived_at = NULL, position = ?, updated_at = datetime('now')
+		  WHERE id = ?`, pos, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// LoadArchived returns boardID's archived cards, most recently archived first,
+// with their labels attached.
+func (db *DB) LoadArchived(ctx context.Context, boardID int64) ([]domain.Card, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT c.id, c.column_id, c.title, c.body, c.position, c.priority, c.due_date, c.archived_at
+		   FROM cards c
+		   JOIN columns col ON col.id = c.column_id
+		  WHERE col.board_id = ? AND c.archived_at IS NOT NULL
+		  ORDER BY c.archived_at DESC, c.id DESC`, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []domain.Card
+	idx := make(map[int64]int)
+	for rows.Next() {
+		var c domain.Card
+		if err := rows.Scan(
+			&c.ID, &c.ColumnID, &c.Title, &c.Body, &c.Position, &c.Priority, &c.DueDate, &c.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		idx[c.ID] = len(cards)
+		cards = append(cards, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(cards) == 0 {
+		return cards, nil
+	}
+
+	lrows, err := db.QueryContext(ctx,
+		`SELECT cl.card_id, l.id, l.board_id, l.name, l.color
+		   FROM card_labels cl
+		   JOIN labels l ON l.id = cl.label_id
+		  WHERE l.board_id = ?
+		  ORDER BY l.name`, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer lrows.Close()
+
+	for lrows.Next() {
+		var cardID int64
+		var l domain.Label
+		if err := lrows.Scan(&cardID, &l.ID, &l.BoardID, &l.Name, &l.Color); err != nil {
+			return nil, err
+		}
+		if i, ok := idx[cardID]; ok {
+			cards[i].Labels = append(cards[i].Labels, l)
+		}
+	}
+	return cards, lrows.Err()
+}
+
 // MoveCard relocates cardID into toColumnID at position index toIndex among
 // that column's other (non-archived) cards, renormalizing the column's
 // positions when the gap either side has collapsed. Moving within the same

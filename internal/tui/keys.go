@@ -25,8 +25,11 @@ type KeyMap struct {
 	ColumnRight  key.Binding
 	WIPLimit     key.Binding
 
-	Labels key.Binding
-	Search key.Binding
+	Labels      key.Binding
+	Search      key.Binding
+	Archive     key.Binding
+	ArchiveView key.Binding
+	Restore     key.Binding
 
 	Help key.Binding
 	Quit key.Binding
@@ -56,8 +59,11 @@ func DefaultKeyMap() KeyMap {
 		ColumnRight:  key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "reorder column right")),
 		WIPLimit:     key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "set WIP limit")),
 
-		Labels: key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "labels")),
-		Search: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+		Labels:      key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "labels")),
+		Search:      key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+		Archive:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "archive card")),
+		ArchiveView: key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "archive view")),
+		Restore:     key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "restore card")),
 
 		Help: key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit: key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),

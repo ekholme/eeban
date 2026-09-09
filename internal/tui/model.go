@@ -51,6 +51,10 @@ type Model struct {
 	labelNaming    bool // sub-input: name for a new label
 	labelNameInput textinput.Model
 
+	showArchive   bool // full-screen archived-card list
+	archive       []domain.Card
+	archiveCursor int
+
 	err error // last mutation error, surfaced as a toast
 
 	toast    string // transient notification text, "" when hidden
@@ -93,6 +97,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case boardLoadedMsg:
 		return m.onBoardLoaded(msg)
 
+	case archiveLoadedMsg:
+		if msg.err != nil {
+			return m, m.setToast("error: " + msg.err.Error())
+		}
+		m.archive = msg.cards
+		m.archiveCursor = clamp(m.archiveCursor, 0, max(len(m.archive)-1, 0))
+		return m, nil
+
 	case toastExpiredMsg:
 		if msg.seq == m.toastSeq {
 			m.toast = ""
@@ -124,6 +136,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.labelPicker {
 			return m.updateLabelPicker(msg)
+		}
+		if m.showArchive {
+			return m.updateArchive(msg)
 		}
 		return m.updateBoard(msg)
 	}
@@ -167,6 +182,10 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.startEdit()
 	case key.Matches(msg, m.keys.Delete):
 		return m.startDelete()
+	case key.Matches(msg, m.keys.Archive):
+		return m.archiveSelected()
+	case key.Matches(msg, m.keys.ArchiveView):
+		return m.openArchive()
 	case key.Matches(msg, m.keys.MoveLeft):
 		return m.moveCardToColumn(-1)
 	case key.Matches(msg, m.keys.MoveRight):
@@ -213,7 +232,24 @@ func (m Model) onBoardLoaded(msg boardLoadedMsg) (tea.Model, tea.Cmd) {
 		m.colCursor = clamp(m.colCursor, 0, m.lastColIndex())
 		m.clampCardCursor()
 	}
+
+	// Keep the archive list fresh while it's on screen.
+	if m.showArchive {
+		return m, m.loadArchiveCmd()
+	}
 	return m, nil
+}
+
+// archiveSelected moves the selected card into the archive.
+func (m Model) archiveSelected() (tea.Model, tea.Cmd) {
+	if m.svc == nil {
+		return m, nil
+	}
+	card, ok := m.selectedCard()
+	if !ok {
+		return m, nil
+	}
+	return m, m.archiveCardCmd(card.ID)
 }
 
 // startAdding opens the title input for a new card in the current column.

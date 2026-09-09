@@ -34,6 +34,12 @@ type boardLoadedMsg struct {
 	err            error
 }
 
+// archiveLoadedMsg carries the archived-card list for the archive view.
+type archiveLoadedMsg struct {
+	cards []domain.Card
+	err   error
+}
+
 // loadBoardMsg reloads boardID and packages it as a boardLoadedMsg.
 func loadBoardMsg(svc *service.Service, boardID int64, selCard, selCol *int64) tea.Msg {
 	board, err := svc.Board(context.Background(), boardID)
@@ -93,6 +99,36 @@ func (m Model) setColumnWIPCmd(columnID int64, limit *int) tea.Cmd {
 			return boardLoadedMsg{err: err}
 		}
 		return loadBoardMsg(svc, boardID, nil, &columnID)
+	}
+}
+
+func (m Model) archiveCardCmd(cardID int64) tea.Cmd {
+	svc, boardID := m.svc, m.boardID
+	return func() tea.Msg {
+		ctx := context.Background()
+		if err := svc.ArchiveCard(ctx, cardID); err != nil {
+			return boardLoadedMsg{err: err}
+		}
+		return loadBoardMsg(svc, boardID, nil, nil)
+	}
+}
+
+func (m Model) unarchiveCardCmd(cardID int64) tea.Cmd {
+	svc, boardID := m.svc, m.boardID
+	return func() tea.Msg {
+		ctx := context.Background()
+		if err := svc.UnarchiveCard(ctx, cardID); err != nil {
+			return boardLoadedMsg{err: err}
+		}
+		return loadBoardMsg(svc, boardID, &cardID, nil)
+	}
+}
+
+func (m Model) loadArchiveCmd() tea.Cmd {
+	svc, boardID := m.svc, m.boardID
+	return func() tea.Msg {
+		cards, err := svc.ArchivedCards(context.Background(), boardID)
+		return archiveLoadedMsg{cards: cards, err: err}
 	}
 }
 

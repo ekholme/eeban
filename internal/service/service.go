@@ -59,6 +59,21 @@ func (s *Service) SetColumnWIP(ctx context.Context, id int64, limit *int) error 
 	return s.db.SetColumnWIP(ctx, id, limit)
 }
 
+// ArchivedCards lists a board's archived cards, most recent first.
+func (s *Service) ArchivedCards(ctx context.Context, boardID int64) ([]domain.Card, error) {
+	return s.db.LoadArchived(ctx, boardID)
+}
+
+// ArchiveCard removes a card from the board view without deleting it.
+func (s *Service) ArchiveCard(ctx context.Context, id int64) error {
+	return s.db.ArchiveCard(ctx, id)
+}
+
+// UnarchiveCard restores an archived card to the end of its column.
+func (s *Service) UnarchiveCard(ctx context.Context, id int64) error {
+	return s.db.UnarchiveCard(ctx, id)
+}
+
 // CreateLabel defines a new coloured label on a board.
 func (s *Service) CreateLabel(ctx context.Context, boardID int64, name, color string) (domain.Label, error) {
 	return s.db.CreateLabel(ctx, boardID, name, color)

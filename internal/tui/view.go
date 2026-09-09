@@ -27,6 +27,9 @@ func (m Model) View() string {
 	if m.showHelp {
 		return m.helpView()
 	}
+	if m.showArchive {
+		return m.archiveView()
+	}
 	if m.labelPicker {
 		return m.labelPickerView()
 	}

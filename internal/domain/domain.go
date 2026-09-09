@@ -41,14 +41,15 @@ func (c Column) OverWIP() bool {
 
 // Card is a single work item within a column.
 type Card struct {
-	ID       int64
-	ColumnID int64
-	Title    string
-	Body     string
-	Position int64
-	Priority int
-	DueDate  *string // RFC3339 date, nil when unset
-	Labels   []Label
+	ID         int64
+	ColumnID   int64
+	Title      string
+	Body       string
+	Position   int64
+	Priority   int
+	DueDate    *string // RFC3339 date, nil when unset
+	ArchivedAt *string // set once the card is archived, nil otherwise
+	Labels     []Label
 }
 
 // HasLabel reports whether the card carries the label with the given id.
