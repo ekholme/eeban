@@ -55,6 +55,13 @@ type Model struct {
 	archive       []domain.Card
 	archiveCursor int
 
+	boardSwitcher  bool // full-screen board list
+	boards         []domain.Board
+	boardCursor    int
+	boardNaming    bool // sub-input: name for a new board
+	boardRenaming  bool // sub-input: rename the highlighted board
+	boardNameInput textinput.Model
+
 	err error // last mutation error, surfaced as a toast
 
 	toast    string // transient notification text, "" when hidden
@@ -105,6 +112,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.archiveCursor = clamp(m.archiveCursor, 0, max(len(m.archive)-1, 0))
 		return m, nil
 
+	case boardsLoadedMsg:
+		if msg.err != nil {
+			return m, m.setToast("error: " + msg.err.Error())
+		}
+		m.boards = msg.boards
+		m.syncBoardCursor()
+		return m, nil
+
 	case toastExpiredMsg:
 		if msg.seq == m.toastSeq {
 			m.toast = ""
@@ -136,6 +151,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.labelPicker {
 			return m.updateLabelPicker(msg)
+		}
+		if m.boardSwitcher {
+			return m.updateBoardSwitcher(msg)
 		}
 		if m.showArchive {
 			return m.updateArchive(msg)
@@ -186,6 +204,8 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.archiveSelected()
 	case key.Matches(msg, m.keys.ArchiveView):
 		return m.openArchive()
+	case key.Matches(msg, m.keys.Boards):
+		return m.openBoardSwitcher()
 	case key.Matches(msg, m.keys.MoveLeft):
 		return m.moveCardToColumn(-1)
 	case key.Matches(msg, m.keys.MoveRight):
@@ -224,6 +244,9 @@ func (m Model) onBoardLoaded(msg boardLoadedMsg) (tea.Model, tea.Cmd) {
 	m.boardID = msg.board.ID
 
 	switch {
+	case msg.resetCursor:
+		m.colCursor, m.cardCursor = 0, 0
+		m.filter, m.filterLabel = "", 0
 	case msg.selectCardID != nil:
 		m.selectCardByID(*msg.selectCardID)
 	case msg.selectColumnID != nil:

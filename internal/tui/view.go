@@ -33,6 +33,9 @@ func (m Model) View() string {
 	if m.labelPicker {
 		return m.labelPickerView()
 	}
+	if m.boardSwitcher {
+		return m.boardSwitcherView()
+	}
 	if len(m.board.Columns) == 0 {
 		return lipgloss.JoinVertical(lipgloss.Left,
 			m.header(),

@@ -30,6 +30,7 @@ type KeyMap struct {
 	Archive     key.Binding
 	ArchiveView key.Binding
 	Restore     key.Binding
+	Boards      key.Binding
 
 	Help key.Binding
 	Quit key.Binding
@@ -64,6 +65,7 @@ func DefaultKeyMap() KeyMap {
 		Archive:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "archive card")),
 		ArchiveView: key.NewBinding(key.WithKeys("A"), key.WithHelp("A", "archive view")),
 		Restore:     key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "restore card")),
+		Boards:      key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "boards")),
 
 		Help: key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit: key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
