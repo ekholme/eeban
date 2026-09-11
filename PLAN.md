@@ -17,6 +17,18 @@ A single-user TUI kanban board. Local-first, keyboard-driven, one SQLite file.
 
 Non-goals: multi-user, web UI, real-time sync, auth, a server.
 
+Feature non-goals (keeps the app minimalist as it grows):
+- No background daemon or desktop notifications — due-date highlighting already
+  covers this in-app; a notifier means a long-running process, which cuts
+  against "one SQLite file, run when you run it."
+- No interactive checklists — markdown rendering already displays `- [ ]` as
+  plain read-only text; making checkboxes clickable means parsing and
+  rewriting card body text for little gain.
+- No swimlanes, sub-boards, or nested cards — keep the `boards → columns →
+  cards` model exactly as flat as it is.
+- No custom/arbitrary card fields — title/body/priority/due/labels is the
+  whole schema, on purpose.
+
 ## Layout
 
 ```
@@ -28,8 +40,9 @@ internal/
     migrate.go               embedded migration runner
     migrations/001_init.sql  schema + seed board
     boards.go                board reads (LoadBoard = board + columns + cards)
-    columns.go               column CRUD / reorder            (later)
+    columns.go               column CRUD / reorder ✅
     cards.go                 card create/update/delete/move ✅
+    labels.go                label CRUD + card_labels join ✅
   service/                   the only API the TUI calls; orchestrates domain + store
   tui/
     model.go                 root Bubble Tea model, Update loop, cursor state
@@ -51,7 +64,9 @@ cards        (id, column_id→columns, title, body, position, priority,
               due_date NULL, created_at, updated_at, archived_at NULL)
 ```
 
-Later migrations add: `labels`, `card_labels`, `card_events`.
+Later migrations add: `labels`, `card_labels` ✅ (`002_labels.sql`). `card_events`
+is not yet migrated — it's a prerequisite for the Stats item under Later, not
+something to add speculatively ahead of it.
 
 **Ordering:** integer `position` with gaps of 1000 (1000, 2000, 3000…). A move
 rewrites one row's position to the midpoint of its neighbours; renormalize a
@@ -86,10 +101,24 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 ### Later
 - [ ] `$EDITOR` integration for card bodies
 - [x] Markdown rendering in detail pane (glamour)
+- [ ] Duplicate/clone card (`c`) — same column, appended below the source,
+  copies title/body/priority/labels; small addition on top of `CreateCard`
+- [ ] Multi-step undo — bump the existing single-step undo to a small bounded
+  in-memory stack (~20 actions); still no persistence, just a deeper history
 - [ ] JSON / Markdown import-export
 - [ ] Themes + configurable keymap (config.toml)
 - [ ] Backup/sync: Litestream, or git the DB file
-- [ ] Stats: throughput / cycle time from `card_events`
+- [ ] `card_events` migration, then stats: throughput / cycle time
+
+### v2 (maybe)
+Bigger, optional bets — split out from Later on purpose so they need
+deliberate buy-in before starting, not just idle time.
+- [ ] Global search across boards — `/` today only filters the current board;
+  searching across all boards needs a new service method and a cross-board
+  result list
+- [ ] Bulk/multi-select actions — visual-mode-style card selection to move,
+  archive, or label several cards at once; real complexity (selection state,
+  multi-cursor rendering), not a given
 
 ## Build sequence
 
