@@ -81,6 +81,7 @@ func (m Model) archiveView() string {
 	}
 
 	b.WriteString(m.styles.DetailDim.Render("\nr restore · d delete · j/k move · A/esc close"))
+	b.WriteString(m.confirmLine())
 
 	box := m.styles.HelpOverlay.Render(b.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)

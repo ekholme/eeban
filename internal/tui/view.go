@@ -183,6 +183,19 @@ func (m Model) helpLine() string {
 	return "h/l·j/k nav · n/e/d/a card · t tag · / search · A archive · b boards · u undo · ? help"
 }
 
+// confirmLine renders the pending yes/no confirmation as an extra line for
+// full-screen overlay views (board switcher, label picker, archive), which
+// — unlike the main board view — have no footer() of their own to show it.
+// Without this, a Delete key pressed inside one of those overlays opens a
+// confirmation with no visible prompt, and the next keystroke silently
+// cancels it. Returns "" when nothing is pending.
+func (m Model) confirmLine() string {
+	if m.confirm == nil {
+		return ""
+	}
+	return "\n" + m.styles.Prompt.Render(m.confirm.prompt+"  (y/n)")
+}
+
 // renderDetail draws the pane describing the selected card.
 func (m Model) renderDetail(width, height int) string {
 	frame := m.styles.Detail.Width(width).Height(height).MaxHeight(height + 2)

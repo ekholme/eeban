@@ -292,9 +292,15 @@ func (m Model) onBoardLoaded(msg boardLoadedMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Keep the archive list fresh while it's on screen.
-	if m.showArchive {
+	// Keep the archive list / board switcher list fresh while one is on
+	// screen — a rename or delete triggered from inside it otherwise leaves
+	// the overlay showing stale data (e.g. a just-deleted board still
+	// listed) even though the underlying mutation succeeded.
+	switch {
+	case m.showArchive:
 		return m, tea.Batch(cmd, m.loadArchiveCmd())
+	case m.boardSwitcher:
+		return m, tea.Batch(cmd, m.loadBoardsCmd())
 	}
 	return m, cmd
 }

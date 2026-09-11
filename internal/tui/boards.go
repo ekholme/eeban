@@ -172,6 +172,7 @@ func (m Model) boardSwitcherView() string {
 	}
 
 	b.WriteString(m.styles.DetailDim.Render("\nenter open · n new · R rename · d delete · b/esc close"))
+	b.WriteString(m.confirmLine())
 
 	box := m.styles.HelpOverlay.Render(b.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)

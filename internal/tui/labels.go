@@ -166,6 +166,7 @@ func (m Model) labelPickerView() string {
 	}
 
 	b.WriteString(m.styles.DetailDim.Render("\nspace toggle · n new · d delete · f filter by label · t/esc close"))
+	b.WriteString(m.confirmLine())
 
 	box := m.styles.HelpOverlay.Render(b.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
