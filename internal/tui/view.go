@@ -2,12 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 
 	"github.com/ekholme/eeban/internal/domain"
 )
@@ -224,9 +226,21 @@ func (m Model) renderDetail(width, height int) string {
 // word-wrapped to width and styled for the terminal's light/dark background.
 // It falls back to the raw text if glamour fails to construct a renderer or
 // render the input, which can happen for pathological input.
+//
+// This deliberately avoids glamour.WithAutoStyle(): it re-detects the
+// background via termenv.HasDarkBackground() on every call, and that
+// termenv lookup is uncached, so it re-queries the terminal (an OSC query
+// round-trip) each time. Bubble Tea already owns stdin in raw mode while
+// the program runs, so that query races Bubble Tea's own input reader for
+// the response and reliably loses, blocking for termenv's ~5s OSCTimeout
+// on every re-render of the pane. markdownStyle below reimplements the
+// same choice glamour's auto style makes, swapping in
+// lipgloss.HasDarkBackground(), which is safe: it's cached (sync.Once) and
+// pre-warmed by Bubble Tea's own init() before the terminal is acquired —
+// see charmbracelet/bubbletea's tea_init.go for the same workaround.
 func renderMarkdown(body string, width int) string {
 	r, err := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
+		glamour.WithStandardStyle(markdownStyle()),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
@@ -237,6 +251,19 @@ func renderMarkdown(body string, width int) string {
 		return body
 	}
 	return strings.TrimRight(out, "\n")
+}
+
+// markdownStyle picks a glamour standard style name without ever querying
+// the terminal at render time (see renderMarkdown). term.IsTerminal is a
+// local ioctl, not a terminal round-trip, so it's always safe to call.
+func markdownStyle() string {
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		return "notty"
+	}
+	if lipgloss.HasDarkBackground() {
+		return "dark"
+	}
+	return "light"
 }
 
 // renderDue formats a card's due date, coloured by how close (or overdue) it is.
