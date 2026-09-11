@@ -85,7 +85,7 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 
 ### Later
 - [ ] `$EDITOR` integration for card bodies
-- [ ] Markdown rendering in detail pane (glamour)
+- [x] Markdown rendering in detail pane (glamour)
 - [ ] JSON / Markdown import-export
 - [ ] Themes + configurable keymap (config.toml)
 - [ ] Backup/sync: Litestream, or git the DB file

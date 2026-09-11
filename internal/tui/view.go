@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/ekholme/eeban/internal/domain"
@@ -211,12 +212,31 @@ func (m Model) renderDetail(width, height int) string {
 	}
 
 	if card.Body != "" {
-		b.WriteString(m.styles.DetailBody.Width(inner).Render(card.Body))
+		b.WriteString(m.styles.DetailBody.Render(renderMarkdown(card.Body, inner)))
 	} else {
 		b.WriteString(m.styles.DetailBody.Render(m.styles.DetailDim.Render("(no description)")))
 	}
 
 	return frame.Render(b.String())
+}
+
+// renderMarkdown renders a card body as markdown for the detail pane,
+// word-wrapped to width and styled for the terminal's light/dark background.
+// It falls back to the raw text if glamour fails to construct a renderer or
+// render the input, which can happen for pathological input.
+func renderMarkdown(body string, width int) string {
+	r, err := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(width),
+	)
+	if err != nil {
+		return body
+	}
+	out, err := r.Render(body)
+	if err != nil {
+		return body
+	}
+	return strings.TrimRight(out, "\n")
 }
 
 // renderDue formats a card's due date, coloured by how close (or overdue) it is.
