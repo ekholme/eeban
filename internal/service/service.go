@@ -5,6 +5,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/ekholme/eeban/internal/domain"
 	"github.com/ekholme/eeban/internal/store"
@@ -51,6 +52,16 @@ func (s *Service) RenameBoard(ctx context.Context, id int64, name string) error 
 // DeleteBoard permanently removes a board and everything on it.
 func (s *Service) DeleteBoard(ctx context.Context, id int64) error {
 	return s.db.DeleteBoard(ctx, id)
+}
+
+// UpcomingCards lists cards from every board that are overdue, due today, or
+// due within domain.UpcomingDays days of now, soonest first.
+func (s *Service) UpcomingCards(ctx context.Context, now time.Time) ([]domain.DueCard, error) {
+	cards, err := s.db.LoadDueCards(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return domain.UpcomingDue(cards, now), nil
 }
 
 // ArchivedCards lists a board's archived cards, most recent first.

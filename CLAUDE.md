@@ -7,9 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `eeban` is a single-user, local-first TUI kanban board: Go + Bubble Tea, one SQLite
 file, keyboard-driven. The MVP and the v1 feature set are implemented: full card
 and column CRUD/move/reorder, labels, fuzzy search, due-date highlighting, WIP
-limits, an archive view, multiple boards, and single-step undo. `PLAN.md` holds
-the locked decisions, data model, feature phases, and build sequence; consult it
-before adding features.
+limits, an archive view, multiple boards, and single-step undo, plus a
+cross-board upcoming-due view. `PLAN.md` holds the locked decisions, data model,
+feature phases, and build sequence; consult it before adding features.
 
 ## Commands
 

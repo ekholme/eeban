@@ -101,6 +101,9 @@ writes never hit `SQLITE_BUSY`. WAL + busy_timeout stay as backstops.
 ### Later
 - [ ] `$EDITOR` integration for card bodies
 - [x] Markdown rendering in detail pane (glamour)
+- [x] Upcoming view (`U`) — cards from every board that are overdue, due
+  today, or due within `domain.UpcomingDays` (5) days, excluding any column
+  named "Done"; `enter` jumps to the card
 - [ ] Duplicate/clone card (`c`) — same column, appended below the source,
   copies title/body/priority/labels; small addition on top of `CreateCard`
 - [ ] Multi-step undo — bump the existing single-step undo to a small bounded

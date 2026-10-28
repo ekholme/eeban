@@ -27,7 +27,8 @@ func toastExpireCmd(seq int) tea.Cmd {
 // mutation. When err is non-nil, board is meaningless and the current model
 // state is left untouched. selectCardID / selectColumnID, when set, tell the
 // model which item the cursor should follow after the reload; resetCursor
-// sends the cursor home instead (used when switching boards).
+// sends the cursor home and clears filters first (used when switching
+// boards), after which selectCardID / selectColumnID still apply.
 type boardLoadedMsg struct {
 	board          domain.Board
 	selectCardID   *int64
@@ -39,6 +40,12 @@ type boardLoadedMsg struct {
 // archiveLoadedMsg carries the archived-card list for the archive view.
 type archiveLoadedMsg struct {
 	cards []domain.Card
+	err   error
+}
+
+// upcomingLoadedMsg carries the cross-board due-card list for the upcoming view.
+type upcomingLoadedMsg struct {
+	cards []domain.DueCard
 	err   error
 }
 
@@ -131,6 +138,24 @@ func (m Model) loadArchiveCmd() tea.Cmd {
 	return func() tea.Msg {
 		cards, err := svc.ArchivedCards(context.Background(), boardID)
 		return archiveLoadedMsg{cards: cards, err: err}
+	}
+}
+
+func (m Model) loadUpcomingCmd() tea.Cmd {
+	svc := m.svc
+	return func() tea.Msg {
+		cards, err := svc.UpcomingCards(context.Background(), time.Now())
+		return upcomingLoadedMsg{cards: cards, err: err}
+	}
+}
+
+// jumpToCardCmd opens boardID (which may be the current board) with filters
+// cleared and the cursor on cardID.
+func (m Model) jumpToCardCmd(boardID, cardID int64) tea.Cmd {
+	svc := m.svc
+	return func() tea.Msg {
+		board, err := svc.Board(context.Background(), boardID)
+		return boardLoadedMsg{board: board, selectCardID: &cardID, resetCursor: true, err: err}
 	}
 }
 

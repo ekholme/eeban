@@ -33,6 +33,9 @@ func (m Model) View() string {
 	if m.showArchive {
 		return m.archiveView()
 	}
+	if m.showUpcoming {
+		return m.upcomingView()
+	}
 	if m.labelPicker {
 		return m.labelPickerView()
 	}
@@ -130,7 +133,7 @@ func (m Model) helpView() string {
 		{"Navigate", []key.Binding{m.keys.Left, m.keys.Right, m.keys.Up, m.keys.Down, m.keys.Detail, m.keys.Back}},
 		{"Cards", []key.Binding{m.keys.New, m.keys.Edit, m.keys.Delete, m.keys.Archive, m.keys.MoveLeft, m.keys.MoveRight, m.keys.ReorderUp, m.keys.ReorderDown}},
 		{"Columns", []key.Binding{m.keys.NewColumn, m.keys.RenameColumn, m.keys.DeleteColumn, m.keys.ColumnLeft, m.keys.ColumnRight, m.keys.WIPLimit}},
-		{"Organise", []key.Binding{m.keys.Labels, m.keys.Search, m.keys.ArchiveView, m.keys.Boards, m.keys.Undo}},
+		{"Organise", []key.Binding{m.keys.Labels, m.keys.Search, m.keys.ArchiveView, m.keys.Upcoming, m.keys.Boards, m.keys.Undo}},
 		{"General", []key.Binding{m.keys.Help, m.keys.Quit}},
 	}
 
@@ -180,7 +183,7 @@ func (m Model) helpLine() string {
 	if m.showDetail {
 		return "j/k card · h/l column · t labels · enter/esc close · ? help · q quit"
 	}
-	return "h/l·j/k nav · n/e/d/a card · t tag · / search · A archive · b boards · u undo · ? help"
+	return "h/l·j/k nav · n/e/d/a card · t tag · / search · A archive · U upcoming · b boards · u undo · ? help"
 }
 
 // confirmLine renders the pending yes/no confirmation as an extra line for

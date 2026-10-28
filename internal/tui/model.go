@@ -55,6 +55,10 @@ type Model struct {
 	archive       []domain.Card
 	archiveCursor int
 
+	showUpcoming   bool // full-screen list of due cards across every board
+	upcoming       []domain.DueCard
+	upcomingCursor int
+
 	boardSwitcher  bool // full-screen board list
 	boards         []domain.Board
 	boardCursor    int
@@ -125,6 +129,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.archiveCursor = clamp(m.archiveCursor, 0, max(len(m.archive)-1, 0))
 		return m, nil
 
+	case upcomingLoadedMsg:
+		if msg.err != nil {
+			return m, m.setToast("error: " + msg.err.Error())
+		}
+		m.upcoming = msg.cards
+		m.upcomingCursor = clamp(m.upcomingCursor, 0, max(len(m.upcoming)-1, 0))
+		return m, nil
+
 	case boardsLoadedMsg:
 		if msg.err != nil {
 			return m, m.setToast("error: " + msg.err.Error())
@@ -158,6 +170,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.showArchive {
 			return m.updateArchive(msg)
+		}
+		if m.showUpcoming {
+			return m.updateUpcoming(msg)
 		}
 		if m.showHelp {
 			return m.updateHelp(msg)
@@ -213,6 +228,8 @@ func (m Model) updateBoard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.archiveSelected()
 	case key.Matches(msg, m.keys.ArchiveView):
 		return m.openArchive()
+	case key.Matches(msg, m.keys.Upcoming):
+		return m.openUpcoming()
 	case key.Matches(msg, m.keys.Labels):
 		return m.openLabelPicker()
 	case key.Matches(msg, m.keys.Search):
@@ -260,10 +277,11 @@ func (m Model) onBoardLoaded(msg boardLoadedMsg) (tea.Model, tea.Cmd) {
 	m.board = msg.board
 	m.boardID = msg.board.ID
 
-	switch {
-	case msg.resetCursor:
+	if msg.resetCursor {
 		m.colCursor, m.cardCursor = 0, 0
 		m.filter, m.filterLabel = "", 0
+	}
+	switch {
 	case msg.selectCardID != nil:
 		m.selectCardByID(*msg.selectCardID)
 	case msg.selectColumnID != nil:

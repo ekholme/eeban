@@ -2,6 +2,9 @@ package tui
 
 import (
 	"strconv"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/ekholme/eeban/internal/domain"
 )
@@ -27,6 +30,11 @@ func truncateText(s string, n int) string {
 		return string(r[:n])
 	}
 	return string(r[:n-1]) + "…"
+}
+
+// padRight pads s with spaces to a display width of w.
+func padRight(s string, w int) string {
+	return s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
 }
 
 // priorityLabel maps a domain priority constant to its display string.
